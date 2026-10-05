@@ -12,6 +12,8 @@ Este documento reúne os requisitos do projeto, organizados por categoria para f
 - RNF04: A persistência dos dados deve ser garantida por uma base de dados MariaDB.
 - RNF05: O tratamento de dados deve cumprir com a RGPD.
 - RNF06: O front-end deverá ser desenvolvido em HTML e CSS.
+- RNF07: O front-end deve estar acessível via internet
+- RNF08: O front-end deve ser encriptado (HTTPS)
 
 ## Regras de escrita de código
 
