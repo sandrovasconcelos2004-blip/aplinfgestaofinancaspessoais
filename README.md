@@ -6,3 +6,6 @@ Equipa:
 - **Sandro Vasconcelos**, 2241106
 
 ## Plataforma para Gestão de Finanças Pessoais 
+
+Para realizar o arranque da aplicação é necessário executar no terminal (seleciona a pasta do projeto) o seguinte comando:
+flask --app app run --debug
