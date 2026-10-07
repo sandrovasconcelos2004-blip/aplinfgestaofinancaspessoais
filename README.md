@@ -6,7 +6,13 @@ Equipa:
 - **Sandro Vasconcelos**, 2241106
 
 ## Plataforma para Gestão de Finanças Pessoais 
+Para preparar o ambiente é necessário executar o seguinte código no terminal (selecionada a pasta do projeto):
 
-Para realizar o arranque da aplicação é necessário executar no terminal (seleciona a pasta do projeto) o seguinte comando:  
+```py -m venv .venv```
+```.venv\Scripts\Activate.ps1```
+```pip install flask pymysql python-dotenv```
+
+
+Para realizar o arranque da aplicação é necessário executar no terminal (selecionada a pasta do projeto) o seguinte comando:  
 
 ```flask --app app run --debug```
