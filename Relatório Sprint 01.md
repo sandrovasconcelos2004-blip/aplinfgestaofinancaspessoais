@@ -53,29 +53,7 @@ Para assegurar a qualidade e conformidade das entregas, a equipa estabeleceu os 
 * **Execução e Testes:** Código validado e a correr sem falhas no ambiente da VM.
 * **Revisão e Integração:** Revisão por pares (*peer review*) e commits no ramo correto do repositório GitHub.
 
----
-
-## 4. Tabela de Execução do Sprint 01
-
-| Tarefa | Responsável | Prioridade | Story Points | Estado |
-| :--- | :--- | :---: | :---: | :---: |
-| Análise das diversas tecnologias para suporte | Filipe, Leonor | Média | 3 | Concluído |
-| Criar repositório no GitHub | Sandro | Alta | 1 | Concluído |
-| Criar prompt para a IA | Leonor | Alta | 2 | Concluído |
-| Elaborar o Product Backlog | Leonor, Sandro | Alta | 5 | Concluído |
-| Gerar o código inicial | Leonor | Média | 3 | Concluído |
-| Configurar VM (MariaDB, Python 3.14, HTTPS) | Filipe | Alta | 3 | Concluído |
-| Elaborar documento em Markdown com os dados | Filipe, Leonor, Sandro | Alta | 2 | Concluído |
-| Elaborar Use Cases | Leonor / Sandro | Alta | 3 | Concluído |
-| Diagrama BPMN (Processos no Signavio) | Sandro | Média | 3 | Concluído |
-| Testar código e validar integração na VM | Filipe | Alta | 5 | Concluído |
-| Colocar tudo no GitHub e preparar README.md | Filipe, Leonor, Sandro | Média | 1 | Concluído |
-
-**Total de Story Points Planeados e Concluídos:** 31 pontos
-
----
-
-## 5. Arquitetura e Ambiente Técnico
+## 4. Arquitetura e Ambiente Técnico
 
 * **Linguagem / Framework:** Python 3.14 com Flask 3.1.3
 * **Base de Dados:** MariaDB
@@ -85,7 +63,7 @@ Para assegurar a qualidade e conformidade das entregas, a equipa estabeleceu os 
 
 ---
 
-## 6. Retspetiva do Sprint (*Sprint Retrospective*)
+## 5. Retspetiva do Sprint (*Sprint Retrospective*)
 
 ### O que correu bem:
 * Rápido alinhamento na definição dos requisitos funcionais e arquitetura.
