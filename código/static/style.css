@@ -1,0 +1,226 @@
+/* ==========================================================================
+   Gestão Financeira Pessoal — folha de estilos comum a todas as páginas
+   ========================================================================== */
+
+/* Cores e medidas reutilizadas (alterar aqui muda o site inteiro) */
+:root {
+    --cor-fundo: #f3f6f4;
+    --cor-cartao: #ffffff;
+    --cor-texto: #1c2b26;
+    --cor-texto-suave: #5d6f68;
+    --cor-borda: #d5ddd9;
+    --cor-principal: #17694f;
+    --cor-principal-escura: #0f4d39;
+    --cor-foco: rgba(23, 105, 79, 0.2);
+    --cor-aviso-fundo: #fdf1dc;
+    --cor-aviso-borda: #e9c46a;
+    --raio: 10px;
+    --largura-formulario: 400px;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--cor-fundo);
+    color: var(--cor-texto);
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+/* --------------------------------------------------------------------------
+   Cabeçalho e navegação
+   -------------------------------------------------------------------------- */
+
+header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 16px 32px;
+    background-color: var(--cor-principal);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+header nav {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+}
+
+header nav a {
+    padding: 8px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: var(--raio);
+    color: #ffffff;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+header nav a:hover,
+header nav a:focus-visible {
+    background-color: #ffffff;
+    color: var(--cor-principal);
+    outline: none;
+
+}
+
+header .organization-header {
+    color: #ffffff;
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+/* --------------------------------------------------------------------------
+   Títulos
+   -------------------------------------------------------------------------- */
+
+h1 {
+    max-width: var(--largura-formulario);
+    margin: 48px auto 20px;
+    padding: 0 16px;
+    font-size: 1.9rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+/* Frase por baixo do formulário ("Não tem uma conta? ...") */
+h2 {
+    max-width: var(--largura-formulario);
+    margin: 20px auto 48px;
+    padding: 0 16px;
+    color: var(--cor-texto-suave);
+    font-size: 0.95rem;
+    font-weight: 400;
+    text-align: center;
+}
+
+h2 a {
+    color: var(--cor-principal);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+h2 a:hover,
+h2 a:focus-visible {
+    text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------------
+   Formulários (login e registo)
+   -------------------------------------------------------------------------- */
+
+form {
+    display: flex;
+    flex-direction: column;
+    width: calc(100% - 32px);
+    max-width: var(--largura-formulario);
+    margin: 0 auto;
+    padding: 32px;
+    background-color: var(--cor-cartao);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio);
+    box-shadow: 0 6px 20px rgba(28, 43, 38, 0.08);
+}
+
+/* Os <br> do HTML deixam de ser precisos: o espaçamento é feito aqui */
+form br {
+    display: none;
+}
+
+label {
+    margin-bottom: 6px;
+    color: var(--cor-texto-suave);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+    width: 100%;
+    margin-bottom: 18px;
+    padding: 11px 12px;
+    background-color: #ffffff;
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio);
+    color: var(--cor-texto);
+    font: inherit;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus {
+    border-color: var(--cor-principal);
+    box-shadow: 0 0 0 3px var(--cor-foco);
+    outline: none;
+}
+
+input[type="submit"],
+button {
+    margin-top: 6px;
+    padding: 12px;
+    background-color: var(--cor-principal);
+    border: none;
+    border-radius: var(--raio);
+    color: #ffffff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+input[type="submit"]:hover,
+button:hover {
+    background-color: var(--cor-principal-escura);
+}
+
+input[type="submit"]:focus-visible,
+button:focus-visible {
+    box-shadow: 0 0 0 3px var(--cor-foco);
+    outline: none;
+}
+
+/* --------------------------------------------------------------------------
+   Mensagens de aviso (flash do Flask) — usar <p class="aviso">...</p>
+   -------------------------------------------------------------------------- */
+
+.aviso {
+    width: calc(100% - 32px);
+    max-width: var(--largura-formulario);
+    margin: 24px auto 0;
+    padding: 12px 16px;
+    background-color: var(--cor-aviso-fundo);
+    border: 1px solid var(--cor-aviso-borda);
+    border-radius: var(--raio);
+    font-size: 0.95rem;
+    text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   Ecrãs pequenos (telemóvel)
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 480px) {
+    header {
+        padding: 12px 16px;
+    }
+
+    h1 {
+        margin-top: 32px;
+        font-size: 1.6rem;
+    }
+
+    form {
+        padding: 24px 20px;
+    }
+}
