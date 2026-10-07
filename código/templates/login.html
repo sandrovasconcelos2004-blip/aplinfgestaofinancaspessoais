@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="pt-pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <a class="organization-header" href="{{ url_for('index') }}">Finances4You</a>
+    </header>
+
+    <h1>Login</h1>
+
+    {% for mensagem in get_flashed_messages() %}
+    <p class="aviso">{{ mensagem }}</p>
+    {% endfor %}
+
+    <form method="post" action="{{ url_for('login') }}">
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" required><br><br>
+
+        <label for="password">Palavra-passe:</label>
+        <input type="password" id="password" name="password" required><br><br>
+
+        <input type="submit" value="Entrar">
+    </form>
+    <h2>Não tem uma conta? <a href="{{ url_for('registo') }}">Registe-se aqui</a></h2>
+
+</body>
+</html>
