@@ -9,6 +9,9 @@
 <body>
     <header>
         Bem-vindo(a), <strong>{{ nome }}</strong>
+        <nav>
+            <a href="{{ url_for('logout') }}">Logout</a>
+        </nav>
     </header>
 </body>
 </html>
