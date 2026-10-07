@@ -44,7 +44,7 @@ O principal objetivo do **Sprint 01** focou-se no planeamento inicial do projeto
 
 ## 3. Definition of Done (DoD)
 
-Para assegurar a qualidade e conformidade das entregas, a equipa estabeleceu os seguintes critérios obrigatórios para a conclusão de qualquer item de trabalho:
+Para assegurar a qualidade e conformidade das entregas, foram estabelecidos os seguintes critérios obrigatórios para a conclusão de qualquer item de trabalho:
 
 * **Padrões de Código:** Arquitetura modular em Flask, remoção de código gerado por IA não validado e parâmetros seguros em SQL contra injeções.
 * **Ambiente e Configuração:** Variáveis sensíveis e credenciais isoladas em ficheiro `.env`.
@@ -71,6 +71,7 @@ Para assegurar a qualidade e conformidade das entregas, a equipa estabeleceu os 
 * Criação antecipada da VM e definição clara da *Definition of Done*.
 
 ### Desafios encontrados:
+* Configuração e arranque do ambiente na Máquina Virtual (VM)
 * Necessidade de refatoração do código sugerido pela IA para cumprir estritamente os padrões modulares do Flask e parâmetros da MariaDB.
 * Ajustes nos certificados para garantir HTTPS na VM local.
 
