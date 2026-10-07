@@ -9,7 +9,9 @@ Equipa:
 Para preparar o ambiente é necessário executar o seguinte código no terminal (selecionada a pasta do projeto):
 
 ```py -m venv .venv```
+
 ```.venv\Scripts\Activate.ps1```
+
 ```pip install flask pymysql python-dotenv```
 
 
