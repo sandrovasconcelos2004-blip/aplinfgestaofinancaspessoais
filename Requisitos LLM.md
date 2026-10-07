@@ -9,7 +9,7 @@ Este documento reúne os requisitos do projeto, organizados por categoria para f
 - RNF01: O código deve ser modular e comentários claros, para facilitar a manutenção de funcionalidades.
 - RNF02: A interface deve ser simples e intuitiva.
 - RNF03: A interface deve estar em português de Portugal e usar euros como moeda.
-- RNF04: A persistência dos dados deve ser garantida por uma base de dados MariaDB.
+- RNF04: A persistência dos dados deve ser garantida por uma base de dados MySQL.
 - RNF05: O tratamento de dados deve cumprir com a RGPD.
 - RNF06: O front-end deverá ser desenvolvido em HTML e CSS e o back-end em Python 3.14 usando a framework FLASK 3.1.3
 - RNF07: O front-end deve ser encriptado (HTTPS)
