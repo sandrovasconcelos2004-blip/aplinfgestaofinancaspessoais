@@ -1,6 +1,6 @@
 # Relatório de Conclusão do Sprint 01
 
-**Projeto:** Sistema de Gestão Financeira Pessoal e Partilhada  
+**Projeto:** Sistema de Gestão Financeira Pessoal  
 **Unidade Curricular:** [Aplicações Informáticas]  
 **Data de Termino do Sprint:** 8 de outubro de 2026  
 **Equipa:**
