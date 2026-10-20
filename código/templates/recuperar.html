@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Recuperar palavra-passe</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <a class="organization-header" href="{{ url_for('index') }}">Finances4You</a>
+    </header>
+
+    <h1>Recuperar palavra-passe</h1>
+
+    {% for categoria, mensagem in get_flashed_messages(with_categories=true) %}
+    <p class="aviso {{ categoria }}">{{ mensagem }}</p>
+    {% endfor %}
+
+<form method="post" action="{{ url_for('recuperar') }}">
+    <label for="email">Email:</label>
+    <input type="email" id="email" name="email" required><br><br>
+
+    <input type="submit" value="Enviar instruções">
+</form>
+<h2>Lembrou-se da palavra-passe? <a href="{{ url_for('login') }}">Faça login aqui</a></h2>
+</body>
+</html>

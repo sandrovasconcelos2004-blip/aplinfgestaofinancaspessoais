@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <title>Nova palavra-passe</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='script.js') }}" defer></script>
+
+</head>
+<body>
+    <header>
+        <a class="organization-header" href="{{ url_for('index') }}">Finances4You</a>
+    </header>
+
+    <h1>Nova palavra-passe</h1>
+
+    {% for categoria, mensagem in get_flashed_messages(with_categories=true) %}
+    <p class="aviso {{ categoria }}">{{ mensagem }}</p>
+    {% endfor %}
+
+<form method="post">
+    <label for="password">Nova palavra-passe:</label>
+    <div class="campo-password">
+        <input type="password" id="password" name="password" minlength="8" required>
+        <button type="button" class="mostrar-password" aria-label="Mostrar palavra-passe">👁</button>
+    </div>
+
+    <label for="password_confirmacao">Confirmar palavra-passe:</label>
+    <div class="campo-password">
+        <input type="password" id="password_confirmacao" name="confirmacao" minlength="8" required>
+        <button type="button" class="mostrar-password" aria-label="Mostrar palavra-passe">👁</button>
+    </div>
+
+    <input type="submit" value="Guardar">
+</form>
+</body>
+</html>

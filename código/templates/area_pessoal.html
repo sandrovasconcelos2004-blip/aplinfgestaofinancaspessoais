@@ -13,5 +13,112 @@
             <a href="{{ url_for('logout') }}">Logout</a>
         </nav>
     </header>
+
+    <main class="dashboard">
+
+        <!-- Coluna esquerda: carteiras, nova carteira e categorias -->
+        <aside>
+            <h2>As minhas carteiras</h2>
+            <ul class="lista-carteiras">
+                {% for c in carteiras %}
+                <li class="{{ 'ativa' if carteira and c.ID_Carteira == carteira.ID_Carteira }}">
+                    <a href="{{ url_for('area_pessoal', carteira=c.ID_Carteira) }}">{{ c.Carteira }}</a>
+                    <span>{{ "%.2f"|format(c.Valor)|replace(".", ",") }} €</span>
+                </li>
+                {% else %}
+                <li>Ainda não tem carteiras.</li>
+                {% endfor %}
+            </ul>
+
+            <details {% if not carteiras %}open{% endif %}>
+                <summary>Nova carteira</summary>
+                <form method="post" action="{{ url_for('criar_carteira') }}">
+                    <label for="nome_carteira">Nome:</label>
+                    <input type="text" id="nome_carteira" name="carteira" maxlength="100" placeholder="Ex.: Pessoal" required>
+
+                    <label for="valor_carteira">Valor inicial (€):</label>
+                    <input type="number" id="valor_carteira" name="valor" step="0.01" min="0" value="0" required>
+
+                    <input type="submit" value="Criar carteira">
+                </form>
+            </details>
+
+            <details>
+                <summary>Categorias</summary>
+                <ul class="lista-categorias">
+                    {% for cat in categorias %}
+                    <li>{{ cat.Categoria }}{% if cat.ID_Utilizador is none %} <small>(pré-definida)</small>{% endif %}</li>
+                    {% endfor %}
+                </ul>
+                <form method="post" action="{{ url_for('criar_categoria') }}">
+                    <input type="hidden" name="carteira" value="{{ carteira.ID_Carteira if carteira else '' }}">
+
+                    <label for="nome_categoria">Nova categoria:</label>
+                    <input type="text" id="nome_categoria" name="categoria" maxlength="100" placeholder="Ex.: Ginásio" required>
+
+                    <input type="submit" value="Criar categoria">
+                </form>
+            </details>
+        </aside>
+
+        <!-- Coluna direita: carteira aberta -->
+        <section>
+            {% for categoria, mensagem in get_flashed_messages(with_categories=true) %}
+            <p class="aviso {{ categoria }}">{{ mensagem }}</p>
+            {% endfor %}
+
+            {% if carteira %}
+            <h1>{{ carteira.Carteira }}</h1>
+            <p class="saldo">Saldo: <strong>{{ "%.2f"|format(carteira.Valor)|replace(".", ",") }} €</strong></p>
+
+            <form method="post" action="{{ url_for('nova_transacao', id_carteira=carteira.ID_Carteira) }}">
+                <label for="descricao">Descrição:</label>
+                <input type="text" id="descricao" name="transacao" maxlength="100" required>
+
+                <label for="tipo">Tipo:</label>
+                <select id="tipo" name="tipo">
+                    <option value="receita">Adicionar saldo</option>
+                    <option value="despesa">Despesa</option>
+                </select>
+
+                <label for="categoria_transacao">Categoria:</label>
+                <select id="categoria_transacao" name="categoria" required>
+                    <option value="" disabled selected>Escolha uma categoria</option>
+                    {% for cat in categorias %}
+                    <option value="{{ cat.ID_Categoria }}">{{ cat.Categoria }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="valor_transacao">Valor (€):</label>
+                <input type="number" id="valor_transacao" name="valor" step="0.01" min="0.01" required>
+
+                <input type="submit" value="Adicionar transação">
+            </form>
+
+            <div class="tabela-scroll">
+                <table class="tabela-transacoes">
+                    <thead>
+                        <tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for t in transacoes %}
+                        <tr>
+                            <td>{{ t.Data.strftime('%d/%m/%Y %H:%M') }}</td>
+                            <td>{{ t.Transacao }}</td>
+                            <td>{{ t.Categoria or '—' }}</td>
+                            <td class="{{ t.Tipo }}">{{ '+' if t.Tipo == 'receita' else '−' }}{{ "%.2f"|format(t.Valor)|replace(".", ",") }} €</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4">Ainda não há transações.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <h1>Bem-vindo(a) à sua área pessoal</h1>
+            <p>Crie a sua primeira carteira no painel ao lado para começar.</p>
+            {% endif %}
+        </section>
+    </main>
 </body>
 </html>

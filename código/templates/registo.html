@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Registo</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='script.js') }}" defer></script>
+
 
 </head>
 <body>
@@ -13,8 +15,8 @@
     </header>
     <h1>Registo</h1>
 
-    {% for mensagem in get_flashed_messages() %}
-    <p class="aviso">{{ mensagem }}</p>
+    {% for categoria, mensagem in get_flashed_messages(with_categories=true) %}
+    <p class="aviso {{ categoria }}">{{ mensagem }}</p>
     {% endfor %}
 
     <form method="post" action="{{ url_for('registo') }}">
@@ -28,7 +30,16 @@
         <input type="email" id="email" name="email" required><br><br>
 
         <label for="password">Palavra-passe:</label>
-        <input type="password" id="password" name="password" minlength="8" required><br><br>
+        <div class="campo-password">
+            <input type="password" id="password" name="password" minlength="8" required>
+            <button type="button" class="mostrar-password" aria-label="Mostrar palavra-passe">👁</button>
+        </div>
+
+        <label for="password_confirmacao">Confirmar palavra-passe:</label>
+        <div class="campo-password">
+            <input type="password" id="password_confirmacao" name="password_confirmacao" minlength="8" required>
+            <button type="button" class="mostrar-password" aria-label="Mostrar palavra-passe">👁</button>
+        </div>
 
         <input type="submit" value="Criar Conta">
     </form>
