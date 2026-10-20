@@ -1,22 +1,122 @@
 /* ==========================================================================
-   Gestão Financeira Pessoal — folha de estilos comum a todas as páginas
+   Finances4You — folha de estilos comum a todas as páginas
+   --------------------------------------------------------------------------
+    1. Variáveis (cores, medidas, sombras) e modo escuro
+    2. Base
+    3. Cabeçalho
+    4. Páginas de autenticação (login, registo, recuperar, repor)
+    5. Formulários (campos e botões)
+    6. Mensagens (flash)
+    7. Dashboard: estrutura
+    8. Dashboard: barra lateral (carteiras e categorias)
+    9. Dashboard: carteira aberta (saldo, nova transação, tabela)
+   10. Ecrãs médios e pequenos
+   11. Acessibilidade: movimento reduzido
    ========================================================================== */
 
-/* Cores e medidas reutilizadas (alterar aqui muda o site inteiro) */
+
+/* --------------------------------------------------------------------------
+   1. Variáveis (alterar aqui muda o site inteiro)
+   -------------------------------------------------------------------------- */
+
 :root {
-    --cor-fundo: #f3f6f4;
+    color-scheme: light;
+
+    /* Superfícies */
+    --cor-fundo: #f5f7f6;
     --cor-cartao: #ffffff;
-    --cor-texto: #1c2b26;
-    --cor-texto-suave: #5d6f68;
-    --cor-borda: #d5ddd9;
-    --cor-principal: #17694f;
-    --cor-principal-escura: #0f4d39;
-    --cor-foco: rgba(23, 105, 79, 0.2);
-    --cor-aviso-fundo: #fdf1dc;
-    --cor-aviso-borda: #e9c46a;
+    --cor-cartao-suave: #f0f4f2;
+    --cor-cabecalho: rgba(255, 255, 255, 0.82);
+    --cor-brilho: rgba(15, 123, 95, 0.10);
+
+    /* Texto */
+    --cor-texto: #0f1d18;
+    --cor-texto-suave: #5a6b64;
+    --cor-texto-fraco: #687871;
+
+    /* Bordas */
+    --cor-borda: #e3e9e6;
+    --cor-borda-forte: #cbd5d0;
+    --cor-borda-hover: #aebbb5;
+
+    /* Marca */
+    --cor-principal: #0f7b5f;          /* fundo dos botões */
+    --cor-principal-escura: #0b6550;   /* botões ao passar o rato */
+    --cor-destaque: #0f7b5f;           /* ligações, carteira aberta */
+    --cor-destaque-fundo: #e8f4ee;     /* fundos suaves da marca */
+    --cor-foco: rgba(15, 123, 95, 0.22);
+
+    /* Valores das transações */
+    --cor-receita: #0f7b5f;
+    --cor-despesa: #c92a2a;
+
+    /* Mensagens */
+    --cor-aviso-fundo: var(--cor-cartao);
+    --cor-aviso-borda: var(--cor-borda);
+    --cor-erro-fundo: #fdf2f2;
+    --cor-erro-borda: #f5c9c9;
+
+    /* Sombras */
+    --sombra-pequena: 0 1px 2px rgba(15, 29, 24, 0.04), 0 1px 3px rgba(15, 29, 24, 0.06);
+    --sombra-grande: 0 1px 2px rgba(15, 29, 24, 0.04), 0 16px 40px -12px rgba(15, 29, 24, 0.16);
+
+    /* Medidas */
     --raio: 10px;
-    --largura-formulario: 400px;
+    --raio-grande: 16px;
+    --altura-campo: 46px;
+    --largura-formulario: 420px;
+    --largura-dashboard: 1200px;
+
+    /* Fontes do sistema: não há pedidos a servidores externos (RGPD) */
+    --fonte: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system,
+             BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif;
+
+    /* Ícones desenhados em SVG */
+    --icone-carteira: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1'/%3E%3Cpath d='M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4'/%3E%3C/svg%3E");
+    --icone-seta: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a9893' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
+
+/* Modo escuro automático (segue a definição do sistema operativo).
+   Para o desativar, apague este bloco. */
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+
+        --cor-fundo: #0b1310;
+        --cor-cartao: #121c18;
+        --cor-cartao-suave: #18241f;
+        --cor-cabecalho: rgba(18, 28, 24, 0.80);
+        --cor-brilho: rgba(79, 209, 165, 0.07);
+
+        --cor-texto: #e5eee9;
+        --cor-texto-suave: #9cada6;
+        --cor-texto-fraco: #7d8f88;
+
+        --cor-borda: #22302a;
+        --cor-borda-forte: #30413a;
+        --cor-borda-hover: #44584f;
+
+        --cor-principal: #10855f;
+        --cor-principal-escura: #0c6e4f;
+        --cor-destaque: #4fd1a5;
+        --cor-destaque-fundo: rgba(79, 209, 165, 0.12);
+        --cor-foco: rgba(79, 209, 165, 0.30);
+
+        --cor-receita: #4fd1a5;
+        --cor-despesa: #ff8a80;
+
+        --cor-erro-fundo: rgba(255, 138, 128, 0.10);
+        --cor-erro-borda: rgba(255, 138, 128, 0.28);
+
+        --sombra-pequena: 0 1px 2px rgba(0, 0, 0, 0.35);
+        --sombra-grande: 0 16px 40px -12px rgba(0, 0, 0, 0.6);
+    }
+}
+
+
+/* --------------------------------------------------------------------------
+   2. Base
+   -------------------------------------------------------------------------- */
 
 *,
 *::before,
@@ -24,28 +124,96 @@
     box-sizing: border-box;
 }
 
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
 body {
     margin: 0;
     min-height: 100vh;
     background-color: var(--cor-fundo);
+    /* Brilho suave da cor da marca no topo da página */
+    background-image: radial-gradient(60rem 28rem at 50% -6rem, var(--cor-brilho), transparent 70%);
+    background-repeat: no-repeat;
     color: var(--cor-texto);
-    font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
-    font-size: 16px;
+    font-family: var(--fonte);
+    font-size: 1rem;
     line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
+::selection {
+    background-color: var(--cor-foco);
+}
+
+a {
+    color: var(--cor-destaque);
+}
+
+h1 {
+    color: var(--cor-texto);
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+
+
 /* --------------------------------------------------------------------------
-   Cabeçalho e navegação
+   3. Cabeçalho
    -------------------------------------------------------------------------- */
 
 header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 16px 32px;
-    background-color: var(--cor-principal);
+    min-height: 64px;
+    /* Alinha o conteúdo do cabeçalho com as margens do dashboard */
+    padding: 0 max(16px, calc((100% - var(--largura-dashboard)) / 2 + 16px));
+    background-color: var(--cor-cabecalho);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    backdrop-filter: saturate(180%) blur(12px);
+    border-bottom: 1px solid var(--cor-borda);
+    color: var(--cor-texto-suave);
+    font-size: 0.9375rem;
+}
+
+/* Logótipo desenhado em CSS, antes do conteúdo de todos os cabeçalhos */
+header::before {
+    content: "€";
+    content: "€" / "";
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    margin-right: 4px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, #1fae84, #0b5f49);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15);
     color: #ffffff;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* Nome do utilizador ("Bem-vindo(a), Nome") */
+header strong {
+    color: var(--cor-texto);
+    font-weight: 600;
+}
+
+header .organization-header {
+    color: var(--cor-texto);
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-decoration: none;
 }
 
 header nav {
@@ -55,128 +223,233 @@ header nav {
 }
 
 header nav a {
-    padding: 8px 16px;
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    display: inline-flex;
+    align-items: center;
+    height: 38px;
+    padding: 0 14px;
+    background-color: var(--cor-cartao);
+    border: 1px solid var(--cor-borda-forte);
     border-radius: var(--raio);
-    color: #ffffff;
+    box-shadow: var(--sombra-pequena);
+    color: var(--cor-texto);
+    font-size: 0.875rem;
     font-weight: 600;
     text-decoration: none;
-    transition: background-color 0.15s, color 0.15s;
+    white-space: nowrap;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 
-header nav a:hover,
+header nav a:hover {
+    background-color: var(--cor-cartao-suave);
+    border-color: var(--cor-borda-hover);
+}
+
+/* "Aceder à Conta" (ligação para o login) em destaque */
+header nav a[href$="/login"] {
+    background-color: var(--cor-principal);
+    border-color: transparent;
+    color: #ffffff;
+}
+
+header nav a[href$="/login"]:hover {
+    background-color: var(--cor-principal-escura);
+}
+
 header nav a:focus-visible {
-    background-color: #ffffff;
-    color: var(--cor-principal);
     outline: none;
-
+    box-shadow: 0 0 0 4px var(--cor-foco);
 }
 
-header .organization-header {
-    color: #ffffff;
-    font-size: 1.5rem;
-    font-weight: 700;
-    text-decoration: none;
-}
 
 /* --------------------------------------------------------------------------
-   Títulos
+   4. Páginas de autenticação (login, registo, recuperar, repor)
+   Nestas páginas, o título, as mensagens, o formulário e as ligações são
+   filhos diretos do <body>: o seletor "body >" aplica-se só a elas.
    -------------------------------------------------------------------------- */
 
-h1 {
+body > h1 {
     max-width: var(--largura-formulario);
-    margin: 48px auto 20px;
+    margin: 56px auto 24px;
     padding: 0 16px;
-    font-size: 1.9rem;
-    font-weight: 700;
+    font-size: 1.875rem;
     text-align: center;
 }
 
-/* Frase por baixo do formulário ("Não tem uma conta? ...") */
-h2 {
-    max-width: var(--largura-formulario);
-    margin: 20px auto 48px;
-    padding: 0 16px;
-    color: var(--cor-texto-suave);
-    font-size: 0.95rem;
-    font-weight: 400;
-    text-align: center;
-}
-
-h2 a {
-    color: var(--cor-principal);
-    font-weight: 600;
-    text-decoration: none;
-}
-
-h2 a:hover,
-h2 a:focus-visible {
-    text-decoration: underline;
-}
-
-/* --------------------------------------------------------------------------
-   Formulários (login e registo)
-   -------------------------------------------------------------------------- */
-
-form {
-    display: flex;
-    flex-direction: column;
+body > form {
     width: calc(100% - 32px);
     max-width: var(--largura-formulario);
     margin: 0 auto;
     padding: 32px;
     background-color: var(--cor-cartao);
     border: 1px solid var(--cor-borda);
-    border-radius: var(--raio);
-    box-shadow: 0 6px 20px rgba(28, 43, 38, 0.08);
+    border-radius: var(--raio-grande);
+    box-shadow: var(--sombra-grande);
 }
 
-/* Os <br> do HTML deixam de ser precisos: o espaçamento é feito aqui */
+body > form:last-child {
+    margin-bottom: 56px;
+}
+
+/* Ligações por baixo do formulário ("Não tem uma conta? ...") */
+body > h2 {
+    max-width: var(--largura-formulario);
+    margin: 24px auto 0;
+    padding: 0 16px;
+    color: var(--cor-texto-suave);
+    font-size: 0.9375rem;
+    font-weight: 400;
+    text-align: center;
+}
+
+body > h2 + h2 {
+    margin-top: 8px;
+}
+
+body > h2:last-child {
+    margin-bottom: 56px;
+}
+
+body > h2 a {
+    font-weight: 600;
+    text-decoration: none;
+}
+
+body > h2 a:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+
+/* --------------------------------------------------------------------------
+   5. Formulários (campos e botões)
+   -------------------------------------------------------------------------- */
+
+form {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+}
+
+/* Os <br> do HTML não são precisos: o espaçamento é feito aqui */
 form br {
     display: none;
 }
 
 label {
     margin-bottom: 6px;
-    color: var(--cor-texto-suave);
-    font-size: 0.9rem;
-    font-weight: 600;
+    color: var(--cor-texto);
+    font-size: 0.875rem;
+    font-weight: 500;
 }
 
 input[type="text"],
 input[type="email"],
-input[type="password"] {
+input[type="password"],
+input[type="number"],
+select {
     width: 100%;
-    margin-bottom: 18px;
-    padding: 11px 12px;
-    background-color: #ffffff;
-    border: 1px solid var(--cor-borda);
+    height: var(--altura-campo);
+    margin: 0 0 16px;
+    padding: 0 14px;
+    background-color: var(--cor-cartao);
+    border: 1px solid var(--cor-borda-forte);
     border-radius: var(--raio);
+    box-shadow: 0 1px 2px rgba(15, 29, 24, 0.04);
     color: var(--cor-texto);
     font: inherit;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    font-size: 1rem; /* 16px evita o zoom automático do iPhone ao tocar no campo */
+    transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+}
+
+input::placeholder {
+    color: var(--cor-texto-fraco);
+    opacity: 1;
+}
+
+input[type="text"]:hover,
+input[type="email"]:hover,
+input[type="password"]:hover,
+input[type="number"]:hover,
+select:hover {
+    border-color: var(--cor-borda-hover);
 }
 
 input[type="text"]:focus,
 input[type="email"]:focus,
-input[type="password"]:focus {
+input[type="password"]:focus,
+input[type="number"]:focus,
+select:focus {
     border-color: var(--cor-principal);
-    box-shadow: 0 0 0 3px var(--cor-foco);
+    box-shadow: 0 0 0 4px var(--cor-foco);
     outline: none;
+}
+
+/* Campo inválido, só depois de o utilizador interagir com ele */
+input:user-invalid,
+select:user-invalid {
+    border-color: var(--cor-despesa);
+}
+
+input:user-invalid:focus,
+select:user-invalid:focus {
+    border-color: var(--cor-despesa);
+    box-shadow: 0 0 0 4px var(--cor-erro-borda);
+}
+
+/* Preenchimento automático do browser com as cores do tema */
+input:-webkit-autofill,
+input:-webkit-autofill:hover {
+    -webkit-text-fill-color: var(--cor-texto);
+    box-shadow: inset 0 0 0 100px var(--cor-cartao);
+    caret-color: var(--cor-texto);
+}
+
+input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--cor-texto);
+    box-shadow: inset 0 0 0 100px var(--cor-cartao), 0 0 0 4px var(--cor-foco);
+}
+
+/* Seta própria nas listas de opções */
+select {
+    -webkit-appearance: none;
+    appearance: none;
+    padding-right: 40px;
+    background-image: var(--icone-seta);
+    background-position: right 14px center;
+    background-repeat: no-repeat;
+    background-size: 16px;
+    cursor: pointer;
+}
+
+/* Esconde as setas de aumentar/diminuir dos campos numéricos */
+input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 input[type="submit"],
 button {
-    margin-top: 6px;
-    padding: 12px;
+    -webkit-appearance: none;
+    appearance: none;
+    height: var(--altura-campo);
+    margin-top: 4px;
+    padding: 0 20px;
     background-color: var(--cor-principal);
-    border: none;
+    border: 1px solid transparent;
     border-radius: var(--raio);
+    box-shadow: var(--sombra-pequena), inset 0 1px 0 rgba(255, 255, 255, 0.12);
     color: #ffffff;
     font: inherit;
+    font-size: 0.9375rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.15s;
+    transition: background-color 0.15s, box-shadow 0.15s, transform 0.05s;
 }
 
 input[type="submit"]:hover,
@@ -184,43 +457,735 @@ button:hover {
     background-color: var(--cor-principal-escura);
 }
 
-input[type="submit"]:focus-visible,
-button:focus-visible {
-    box-shadow: 0 0 0 3px var(--cor-foco);
-    outline: none;
+input[type="submit"]:active,
+button:active {
+    transform: translateY(1px);
 }
 
+input[type="submit"]:focus-visible,
+button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--cor-foco);
+}
+
+
 /* --------------------------------------------------------------------------
-   Mensagens de aviso (flash do Flask) — usar <p class="aviso">...</p>
+   6. Mensagens (flash do Flask) — <p class="aviso">...</p>
+   Variantes opcionais: class="aviso sucesso" e class="aviso erro"
    -------------------------------------------------------------------------- */
 
 .aviso {
-    width: calc(100% - 32px);
-    max-width: var(--largura-formulario);
-    margin: 24px auto 0;
-    padding: 12px 16px;
+    position: relative;
+    margin: 0 0 16px;
+    padding: 12px 16px 12px 46px;
     background-color: var(--cor-aviso-fundo);
     border: 1px solid var(--cor-aviso-borda);
+    border-radius: 12px;
+    box-shadow: var(--sombra-pequena);
+    color: var(--cor-texto);
+    font-size: 0.9375rem;
+    line-height: 1.45;
+    animation: surgir 0.25s ease-out both;
+}
+
+/* Ícone circular à esquerda da mensagem */
+.aviso::before {
+    content: "i";
+    content: "i" / "";
+    position: absolute;
+    top: 13px;
+    left: 14px;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: var(--cor-principal);
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.aviso.sucesso {
+    background-color: var(--cor-destaque-fundo);
+}
+
+.aviso.sucesso::before {
+    content: "✓";
+    content: "✓" / "";
+}
+
+.aviso.erro {
+    background-color: var(--cor-erro-fundo);
+    border-color: var(--cor-erro-borda);
+}
+
+.aviso.erro::before {
+    content: "!";
+    content: "!" / "";
+    background-color: var(--cor-despesa);
+    color: var(--cor-cartao);
+}
+
+/* Nas páginas de autenticação, a mensagem tem a largura do formulário */
+body > .aviso {
+    width: calc(100% - 32px);
+    max-width: var(--largura-formulario);
+    margin: 0 auto 16px;
+}
+
+@keyframes surgir {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+
+/* --------------------------------------------------------------------------
+   7. Dashboard: estrutura (barra lateral à esquerda, carteira à direita)
+   -------------------------------------------------------------------------- */
+
+.dashboard {
+    display: grid;
+    grid-template-columns: 300px minmax(0, 1fr);
+    align-items: start;
+    gap: 32px;
+    max-width: var(--largura-dashboard);
+    margin: 32px auto 64px;
+    padding: 0 16px;
+}
+
+/* Impede que a tabela alargue a coluna para além do ecrã */
+.dashboard > * {
+    min-width: 0;
+}
+
+.dashboard h1 {
+    margin: 0 0 16px;
+}
+
+
+/* --------------------------------------------------------------------------
+   8. Dashboard: barra lateral (carteiras e categorias)
+   -------------------------------------------------------------------------- */
+
+.dashboard > aside {
+    position: sticky;
+    top: 88px; /* altura do cabeçalho + margem */
+    max-height: calc(100vh - 112px);
+    overflow-y: auto;
+    padding: 20px 20px 8px;
+    background-color: var(--cor-cartao);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-grande);
+    box-shadow: var(--sombra-pequena);
+    scrollbar-width: thin;
+    scrollbar-color: var(--cor-borda-forte) transparent;
+}
+
+/* "As minhas carteiras" */
+.dashboard aside h2 {
+    margin: 0 0 10px;
+    padding: 0 4px;
+    color: var(--cor-texto-suave);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+/* Lista de carteiras */
+.lista-carteiras {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0 0 16px;
+    padding: 0;
+    list-style: none;
+}
+
+.lista-carteiras li {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid transparent;
     border-radius: var(--raio);
-    font-size: 0.95rem;
+    color: var(--cor-texto-suave);
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+/* Ícone de carteira (máscara SVG: assume a cor do texto) */
+.lista-carteiras li::before {
+    content: "";
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    background-color: currentColor;
+    -webkit-mask: var(--icone-carteira) center / contain no-repeat;
+    mask: var(--icone-carteira) center / contain no-repeat;
+}
+
+.lista-carteiras li:hover {
+    background-color: var(--cor-cartao-suave);
+}
+
+.lista-carteiras a {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--cor-texto);
+    font-weight: 600;
+    text-decoration: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Torna a linha inteira clicável, e não só o nome */
+.lista-carteiras a::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--raio);
+}
+
+.lista-carteiras a:focus-visible {
+    outline: none;
+}
+
+.lista-carteiras a:focus-visible::after {
+    box-shadow: 0 0 0 3px var(--cor-foco);
+}
+
+/* Valor da carteira, alinhado à direita */
+.lista-carteiras span {
+    margin-left: auto;
+    font-size: 0.875rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Carteira aberta */
+.lista-carteiras li.ativa {
+    background-color: var(--cor-destaque-fundo);
+    border-color: var(--cor-borda);
+    border-color: color-mix(in srgb, var(--cor-destaque) 25%, transparent);
+    color: var(--cor-destaque);
+}
+
+.lista-carteiras li.ativa a {
+    color: var(--cor-destaque);
+}
+
+/* Sem carteiras ("Ainda não tem carteiras.") */
+.lista-carteiras li:not(:has(a)) {
+    justify-content: center;
+    padding: 16px 12px;
+    border: 1px dashed var(--cor-borda-forte);
+    font-size: 0.9rem;
+}
+
+.lista-carteiras li:not(:has(a))::before {
+    display: none;
+}
+
+.lista-carteiras li:not(:has(a)):hover {
+    background-color: transparent;
+}
+
+/* Secções que abrem e fecham ("Nova carteira", "Categorias") */
+.dashboard aside details {
+    border-top: 1px solid var(--cor-borda);
+}
+
+.dashboard aside details[open] {
+    padding-bottom: 16px;
+}
+
+.dashboard aside summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 4px;
+    border-radius: 8px;
+    color: var(--cor-texto);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s;
+}
+
+/* Remove o triângulo do browser */
+.dashboard aside summary::-webkit-details-marker {
+    display: none;
+}
+
+/* Seta: aponta para a direita quando fechado e para baixo quando aberto */
+.dashboard aside summary::after {
+    content: "";
+    width: 8px;
+    height: 8px;
+    margin-right: 4px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    opacity: 0.55;
+    transform: rotate(-45deg);
+    transition: transform 0.2s;
+}
+
+.dashboard aside details[open] > summary::after {
+    transform: rotate(45deg);
+}
+
+.dashboard aside summary:hover,
+.dashboard aside details[open] > summary {
+    color: var(--cor-destaque);
+}
+
+.dashboard aside summary:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--cor-foco);
+}
+
+.dashboard aside details[open] > :not(summary) {
+    animation: surgir 0.2s ease-out;
+}
+
+/* Botões da barra lateral: versão secundária, mais discreta */
+.dashboard aside input[type="submit"] {
+    background-color: var(--cor-destaque-fundo);
+    box-shadow: none;
+    color: var(--cor-destaque);
+}
+
+.dashboard aside input[type="submit"]:hover {
+    background-color: color-mix(in srgb, var(--cor-destaque) 20%, transparent);
+}
+
+.dashboard aside input[type="submit"]:focus-visible {
+    box-shadow: 0 0 0 4px var(--cor-foco);
+}
+
+/* Lista de categorias */
+.lista-categorias {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 240px;
+    margin: 0 0 16px;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+    scrollbar-width: thin;
+    scrollbar-color: var(--cor-borda-forte) transparent;
+}
+
+.lista-categorias li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+
+/* Ponto colorido: verde nas categorias do utilizador, cinzento nas pré-definidas */
+.lista-categorias li::before {
+    content: "";
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--cor-destaque);
+}
+
+.lista-categorias li:has(small)::before {
+    background-color: var(--cor-borda-hover);
+}
+
+/* "(pré-definida)" */
+.lista-categorias small {
+    margin-left: auto;
+    color: var(--cor-texto-suave);
+    font-size: 0.75rem;
+}
+
+
+/* --------------------------------------------------------------------------
+   9. Dashboard: carteira aberta (saldo, nova transação, tabela)
+   -------------------------------------------------------------------------- */
+
+/* Cartão do saldo */
+.saldo {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0 0 24px;
+    padding: 24px 28px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #11845f 0%, #0b5e47 55%, #073d2f 100%);
+    box-shadow: 0 12px 32px -12px rgba(7, 61, 47, 0.6);
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.saldo strong {
+    color: #ffffff;
+    font-size: clamp(2rem, 5vw, 2.75rem);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    text-transform: none;
+}
+
+/* Círculos decorativos no fundo do cartão */
+.saldo::before,
+.saldo::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.07);
+}
+
+.saldo::before {
+    top: -90px;
+    right: -50px;
+    width: 220px;
+    height: 220px;
+}
+
+.saldo::after {
+    right: 90px;
+    bottom: -90px;
+    width: 160px;
+    height: 160px;
+}
+
+/* Formulário de nova transação */
+.dashboard section form {
+    margin: 0 0 24px;
+    padding: 24px;
+    background-color: var(--cor-cartao);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-grande);
+    box-shadow: var(--sombra-pequena);
+}
+
+/* Em ecrãs largos, os campos ficam em duas colunas:
+     Descrição | Categoria
+     Tipo      | Valor
+     [    Adicionar transação    ]                                        */
+@media (min-width: 640px) {
+    .dashboard section form {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: repeat(4, auto);
+        grid-auto-flow: column;
+        column-gap: 16px;
+    }
+
+    .dashboard section form input[type="submit"] {
+        grid-row: 5;
+        grid-column: 1 / -1;
+    }
+}
+
+/* Área pessoal ainda sem carteiras */
+.dashboard section > p:not([class]) {
+    margin: 0;
+    padding: 40px 24px;
+    background-color: var(--cor-cartao);
+    border: 1px dashed var(--cor-borda-forte);
+    border-radius: var(--raio-grande);
+    color: var(--cor-texto-suave);
     text-align: center;
 }
 
+/* Tabela de transações */
+.tabela-scroll {
+    position: relative;
+    overflow-x: auto;
+    background-color: var(--cor-cartao);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-grande);
+    box-shadow: var(--sombra-pequena);
+    scrollbar-width: thin;
+    scrollbar-color: var(--cor-borda-forte) transparent;
+}
+
+.tabela-transacoes {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+}
+
+.tabela-transacoes th {
+    padding: 12px 16px;
+    background-color: var(--cor-cartao-suave);
+    border-bottom: 1px solid var(--cor-borda);
+    color: var(--cor-texto-suave);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.tabela-transacoes td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--cor-borda);
+    vertical-align: middle;
+}
+
+.tabela-transacoes tbody tr {
+    transition: background-color 0.12s;
+}
+
+.tabela-transacoes tbody tr:hover {
+    background-color: var(--cor-cartao-suave);
+}
+
+.tabela-transacoes tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+/* Data */
+.tabela-transacoes td:first-child {
+    color: var(--cor-texto-suave);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Descrição */
+.tabela-transacoes td:nth-child(2) {
+    font-weight: 500;
+}
+
+/* Categoria */
+.tabela-transacoes td:nth-child(3) {
+    color: var(--cor-texto-suave);
+}
+
+/* Valor: alinhado à direita, com algarismos da mesma largura */
+.tabela-transacoes th:last-child,
+.tabela-transacoes td:last-child {
+    text-align: right;
+}
+
+.tabela-transacoes td:last-child {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.tabela-transacoes .receita {
+    color: var(--cor-receita);
+}
+
+.tabela-transacoes .despesa {
+    color: var(--cor-despesa);
+}
+
+/* Linha "Ainda não há transações." */
+.tabela-transacoes td[colspan] {
+    padding: 40px 16px;
+    color: var(--cor-texto-suave);
+    font-size: 0.9375rem;
+    font-weight: 400;
+    text-align: center;
+    white-space: normal;
+}
+
+.tabela-transacoes tbody tr:has(td[colspan]):hover {
+    background-color: transparent;
+}
+
+.campo-password {
+    position: relative;
+    margin-bottom: 16px;
+}
+
+.campo-password input {
+    margin: 0;
+    padding-right: 48px;   /* espaço para o texto não ficar por baixo do botão */
+}
+
+.mostrar-password {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 44px;
+    height: var(--altura-campo);
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--cor-texto-suave);
+    cursor: pointer;
+}
+
+.mostrar-password:hover {
+    background: transparent;
+    color: var(--cor-texto);
+}
+
+.mostrar-password:active {
+    transform: none;
+}
+
+
+
 /* --------------------------------------------------------------------------
-   Ecrãs pequenos (telemóvel)
+   10. Ecrãs médios e pequenos
    -------------------------------------------------------------------------- */
+
+/* Tablet e telemóvel: dashboard numa só coluna */
+@media (max-width: 900px) {
+    .dashboard {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 24px;
+        margin-top: 24px;
+    }
+
+    .dashboard > aside {
+        position: static;
+        max-height: none;
+        overflow: visible;
+    }
+}
+
+/* Telemóvel: cada transação passa a ser uma linha compacta
+   (descrição e valor em cima; data e categoria por baixo) */
+@media (max-width: 560px) {
+    /* O cabeçalho da tabela fica escondido, mas os leitores de ecrã continuam a lê-lo */
+    .tabela-transacoes thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .tabela-transacoes,
+    .tabela-transacoes tbody {
+        display: block;
+    }
+
+    .tabela-transacoes tbody tr {
+        display: grid;
+        grid-template-areas:
+            "descricao descricao valor"
+            "data      categoria categoria";
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 2px 8px;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--cor-borda);
+    }
+
+    .tabela-transacoes tbody tr:last-child {
+        border-bottom: 0;
+    }
+
+    .tabela-transacoes td {
+        display: block;
+        padding: 0;
+        border: 0;
+    }
+
+    .tabela-transacoes td:nth-child(1) {
+        grid-area: data;
+        font-size: 0.8125rem;
+    }
+
+    .tabela-transacoes td:nth-child(2) {
+        grid-area: descricao;
+    }
+
+    .tabela-transacoes td:nth-child(3) {
+        grid-area: categoria;
+        font-size: 0.8125rem;
+    }
+
+    .tabela-transacoes td:nth-child(3)::before {
+        content: "·";
+        content: "·" / "";
+        margin-right: 8px;
+    }
+
+    .tabela-transacoes td:nth-child(4) {
+        grid-area: valor;
+    }
+
+    .tabela-transacoes td[colspan] {
+        grid-area: auto;
+        grid-column: 1 / -1;
+        padding: 24px 0;
+        font-size: 0.9375rem;
+    }
+}
 
 @media (max-width: 480px) {
     header {
-        padding: 12px 16px;
+        min-height: 56px;
+        font-size: 0.875rem;
     }
 
-    h1 {
-        margin-top: 32px;
-        font-size: 1.6rem;
+    header::before {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        font-size: 0.875rem;
     }
 
-    form {
+    body > h1 {
+        margin-top: 40px;
+        font-size: 1.625rem;
+    }
+
+    body > form {
         padding: 24px 20px;
+    }
+
+    .dashboard h1 {
+        font-size: 1.5rem;
+    }
+
+    .saldo {
+        padding: 20px 22px;
+    }
+}
+
+
+/* --------------------------------------------------------------------------
+   11. Acessibilidade: quem pede menos movimento no sistema não vê animações
+   -------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
     }
 }
