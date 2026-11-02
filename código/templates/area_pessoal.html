@@ -10,7 +10,8 @@
     <header>
         Bem-vindo(a), <strong>{{ nome }}</strong>
         <nav>
-            <a href="{{ url_for('logout') }}">Logout</a>
+           <a href="{{ url_for('grupos') }}" class="botao-verde">Grupos</a>
+           <a href="{{ url_for('logout') }}">Logout</a>
         </nav>
     </header>
 
@@ -69,51 +70,174 @@
 
             {% if carteira %}
             <h1>{{ carteira.Carteira }}</h1>
-            <p class="saldo">Saldo: <strong>{{ "%.2f"|format(carteira.Valor)|replace(".", ",") }} €</strong></p>
+            <p class="saldo">
+                Saldo: <strong>{{ "%.2f"|format(carteira.Valor)|replace(".", ",") }} €</strong>
+                <span class="botoes-saldo">
+                    <button type="button" class="botao-saldo botao-receita" data-tipo="receita" aria-label="Adicionar saldo" title="Adicionar saldo">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                    </button>
+                    <button type="button" class="botao-saldo botao-despesa" data-tipo="despesa" aria-label="Adicionar despesa" title="Adicionar despesa">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>
+                    </button>
+                </span>
+            </p>
+            <nav class="filtro-meses" aria-label="Filtrar transações por mês">
+                {% for f in [filtros.esquerda, filtros.centro, filtros.direita] %}
+                    {% if f.ativo %}
+                    <span class="ativo" aria-current="true">{{ f.texto }}</span>
+                    {% else %}
+                    <a href="{{ url_for('area_pessoal', carteira=carteira.ID_Carteira, mes=f.mes) }}">{{ f.texto }}</a>
+                    {% endif %}
+                {% endfor %}
+            </nav>
 
-            <form method="post" action="{{ url_for('nova_transacao', id_carteira=carteira.ID_Carteira) }}">
-                <label for="descricao">Descrição:</label>
-                <input type="text" id="descricao" name="transacao" maxlength="100" required>
 
-                <label for="tipo">Tipo:</label>
-                <select id="tipo" name="tipo">
-                    <option value="receita">Adicionar saldo</option>
-                    <option value="despesa">Despesa</option>
-                </select>
 
-                <label for="categoria_transacao">Categoria:</label>
-                <select id="categoria_transacao" name="categoria" required>
-                    <option value="" disabled selected>Escolha uma categoria</option>
-                    {% for cat in categorias %}
-                    <option value="{{ cat.ID_Categoria }}">{{ cat.Categoria }}</option>
-                    {% endfor %}
-                </select>
 
-                <label for="valor_transacao">Valor (€):</label>
-                <input type="number" id="valor_transacao" name="valor" step="0.01" min="0.01" required>
+    <dialog id="janela-transacao" class="janela-transacao" aria-labelledby="titulo-janela">
+        <div class="topo-janela">
+            <h2 id="titulo-janela">Adicionar despesa</h2>
+            <button type="button" class="fechar" aria-label="Fechar">×</button>
+        </div>
 
-                <input type="submit" value="Adicionar transação">
-            </form>
+        <form id="form-transacao" method="post"
+            action="{{ url_for('nova_transacao', id_carteira=carteira.ID_Carteira) }}"
+            data-url-criar="{{ url_for('nova_transacao', id_carteira=carteira.ID_Carteira) }}">
 
-            <div class="tabela-scroll">
-                <table class="tabela-transacoes">
-                    <thead>
-                        <tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th></tr>
-                    </thead>
-                    <tbody>
-                        {% for t in transacoes %}
-                        <tr>
-                            <td>{{ t.Data.strftime('%d/%m/%Y %H:%M') }}</td>
-                            <td>{{ t.Transacao }}</td>
-                            <td>{{ t.Categoria or '—' }}</td>
-                            <td class="{{ t.Tipo }}">{{ '+' if t.Tipo == 'receita' else '−' }}{{ "%.2f"|format(t.Valor)|replace(".", ",") }} €</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="4">Ainda não há transações.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+            <!-- O tipo é escolhido pelo botão (+ ou −), por isso fica escondido -->
+            <input type="hidden" id="tipo" name="tipo" value="despesa">
+
+            <label for="descricao">Descrição:</label>
+            <input type="text" id="descricao" name="transacao" maxlength="100" required>
+
+            <label for="categoria_transacao">Categoria:</label>
+            <select id="categoria_transacao" name="categoria" required>
+                <option value="" disabled selected>Escolha uma categoria</option>
+                {% for cat in categorias %}
+                <option value="{{ cat.ID_Categoria }}">{{ cat.Categoria }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="valor_transacao">Valor (€):</label>
+            <input type="number" id="valor_transacao" name="valor" step="0.01" min="0.01" required>
+
+            <label for="data_transacao">Data:</label>
+            <input type="date" id="data_transacao" name="data" value="{{ hoje }}" required>
+
+            <input type="submit" id="botao-guardar" value="Guardar">
+        </form>
+    </dialog>
+    <dialog id="janela-acoes" class="janela-transacao" aria-labelledby="titulo-acoes">
+    <div class="topo-janela">
+        <h2 id="titulo-acoes"></h2>
+        <button type="button" class="fechar" aria-label="Fechar">×</button>
+    </div>
+
+    <form id="form-eliminar" class="acoes-janela" method="post">
+        <button type="button" class="editar" id="botao-editar">Editar</button>
+        <input type="submit" class="botao-perigo" value="Eliminar">
+    </form>
+    </dialog>
+
+    <div class="tabela-scroll">
+        <table class="tabela-transacoes">
+            <thead>
+                <tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th></tr>
+            </thead>
+            <tbody>
+                {% for t in transacoes %}
+                <tr class="{{ 'agendada' if not t.Aplicada }} {{ 'clicavel' if not t.Bloqueada }}"
+                    {% if not t.Bloqueada %}
+                    tabindex="0"
+                    data-descricao="{{ t.Transacao }}"
+                    data-tipo="{{ t.Tipo }}"
+                    data-categoria="{{ t.ID_Categoria }}"
+                    data-valor="{{ '%.2f'|format(t.Valor) }}"
+                    data-data="{{ t.Data.strftime('%Y-%m-%d') }}"
+                    data-url-editar="{{ url_for('editar_transacao', id_transacao=t.ID_Transacao) }}"
+                    data-url-eliminar="{{ url_for('eliminar_transacao', id_transacao=t.ID_Transacao) }}"
+                    {% else %}
+                    title="Transação de grupo ou saldo inicial: não pode ser alterada aqui."
+                    {% endif %}>
+                    <td>
+                        {{ t.Data.strftime('%d/%m/%Y') }}{% if t.Aplicada %} {{ t.Data.strftime('%H:%M') }}{% else %} <small>Agendada</small>{% endif %}
+                    </td>
+                    <td>{{ t.Transacao }}</td>
+                    <td>{{ t.Categoria or '—' }}</td>
+                    <td class="{{ t.Tipo }}">{{ '+' if t.Tipo == 'receita' else '−' }}{{ "%.2f"|format(t.Valor)|replace(".", ",") }} €</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4">Não há transações neste período.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <script>
+        const janela = document.getElementById("janela-transacao");
+        const formTransacao = document.getElementById("form-transacao");
+        const campoTipo = document.getElementById("tipo");
+        const titulo = document.getElementById("titulo-janela");
+        const botaoGuardar = document.getElementById("botao-guardar");
+
+        // + e −: formulário vazio, em modo "criar"
+        document.querySelectorAll(".botao-saldo").forEach(function (botao) {
+            botao.addEventListener("click", function () {
+                formTransacao.reset();
+                formTransacao.action = formTransacao.dataset.urlCriar;
+                campoTipo.value = botao.dataset.tipo;
+                titulo.textContent = botao.dataset.tipo === "receita" ? "Adicionar saldo" : "Adicionar despesa";
+                botaoGuardar.value = "Guardar";
+                janela.showModal();
+            });
+        });
+
+        janela.querySelector(".fechar").addEventListener("click", function () {
+            janela.close();
+        });
+
+        // Clique numa transação: pop-up com Editar / Eliminar
+        const janelaAcoes = document.getElementById("janela-acoes");
+        const formEliminar = document.getElementById("form-eliminar");
+        let linhaEscolhida = null;
+
+        document.querySelectorAll("tr.clicavel").forEach(function (linha) {
+            function abrirAcoes() {
+                linhaEscolhida = linha;
+                document.getElementById("titulo-acoes").textContent = linha.dataset.descricao;
+                formEliminar.action = linha.dataset.urlEliminar;
+                janelaAcoes.showModal();
+            }
+            linha.addEventListener("click", abrirAcoes);
+            // Com o teclado: Enter ou espaço também abrem
+            linha.addEventListener("keydown", function (evento) {
+                if (evento.key === "Enter" || evento.key === " ") {
+                    evento.preventDefault();
+                    abrirAcoes();
+                }
+            });
+        });
+
+        janelaAcoes.querySelector(".fechar").addEventListener("click", function () {
+            janelaAcoes.close();
+        });
+
+        // Editar: o formulário de criar, preenchido com os dados da linha
+        document.getElementById("botao-editar").addEventListener("click", function () {
+            const dados = linhaEscolhida.dataset;
+            janelaAcoes.close();
+
+            formTransacao.action = dados.urlEditar;
+            campoTipo.value = dados.tipo;
+            document.getElementById("descricao").value = dados.descricao;
+            document.getElementById("categoria_transacao").value = dados.categoria;
+            document.getElementById("valor_transacao").value = dados.valor;
+            document.getElementById("data_transacao").value = dados.data;
+
+            titulo.textContent = dados.tipo === "receita" ? "Editar saldo" : "Editar despesa";
+            botaoGuardar.value = "Guardar alterações";
+            janela.showModal();
+        });
+    </script>
             {% else %}
             <h1>Bem-vindo(a) à sua área pessoal</h1>
             <p>Crie a sua primeira carteira no painel ao lado para começar.</p>

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Grupos</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        Bem-vindo(a), <strong>{{ nome }}</strong>
+        <nav>
+           <a href="{{ url_for('area_pessoal') }}" class="botao-verde">Carteiras</a>
+           <a href="{{ url_for('logout') }}">Logout</a>
+        </nav>
+    </header>
+
+    <main class="dashboard">
+
+        <!-- Coluna esquerda: grupos, convites e novo grupo -->
+        <aside>
+            <h2>Os meus grupos</h2>
+            <ul class="lista-carteiras lista-grupos">
+                {% for g in grupos %}
+                <li class="{{ 'ativa' if grupo and g.ID_Grupo == grupo.ID_Grupo }}">
+                    <a href="{{ url_for('grupos', grupo=g.ID_Grupo) }}">{{ g.Grupo }}</a>
+                    <span>{{ g.Funcao }}</span>
+                </li>
+                {% else %}
+                <li>Ainda não pertence a nenhum grupo.</li>
+                {% endfor %}
+            </ul>
+
+            {% if convites %}
+            <h2>Convites pendentes</h2>
+            <ul class="lista-convites">
+                {% for c in convites %}
+                <li>
+                    <span><strong>{{ c.Grupo }}</strong> Convidado(a) por {{ c.Nome }} {{ c.Apelido }}</span>
+                    <div class="acoes-convite">
+                        <form method="post" action="{{ url_for('aceitar_convite', id_convite=c.ID_Convite) }}">
+                            <input type="submit" value="Aceitar">
+                        </form>
+                        <form method="post" action="{{ url_for('recusar_convite', id_convite=c.ID_Convite) }}">
+                            <input type="submit" value="Recusar">
+                        </form>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+
+            <details {% if not grupos %}open{% endif %}>
+                <summary>Novo grupo</summary>
+                <form method="post" action="{{ url_for('criar_grupo') }}">
+                    <label for="nome_grupo">Nome:</label>
+                    <input type="text" id="nome_grupo" name="grupo" maxlength="100" placeholder="Ex.: Viagem Algarve" required>
+
+                    <input type="submit" value="Criar grupo">
+                </form>
+            </details>
+        </aside>
+
+        <!-- Coluna direita: grupo aberto -->
+        <section>
+            {% for categoria, mensagem in get_flashed_messages(with_categories=true) %}
+            <p class="aviso {{ categoria }}">{{ mensagem }}</p>
+            {% endfor %}
+
+            {% if grupo %}
+            <h1>{{ grupo.Grupo }}</h1>
+            <p class="detalhes-grupo">
+                Criado em {{ grupo.Data_Criacao.strftime('%d/%m/%Y') }} · A sua função: {{ grupo.Funcao }}
+            </p>
+            <p class="saldo">
+                Membros: <strong>{{ membros|length }}</strong>
+                {% if carteiras %}
+                <span class="botoes-saldo">
+                    <button type="button" class="botao-saldo botao-receita" id="abrir-transacao-grupo" aria-label="Adicionar despesa de grupo" title="Adicionar despesa de grupo">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                    </button>
+                </span>
+                {% endif %}
+            </p>
+
+
+            <details class="bloco-membros">
+                <summary><span class="so-leitor">Ver membros</span></summary>
+                <ul class="lista-categorias lista-membros">
+                    {% for m in membros %}
+                    <li>
+                        {{ m.Nome }} {{ m.Apelido }} <small>{{ m.Funcao }}</small>
+                        {% if e_administrador and m.ID_Utilizador != id_utilizador %}
+                        <button type="button" class="remover-membro"
+                                data-url="{{ url_for('remover_membro', id_grupo=grupo.ID_Grupo, id_membro=m.ID_Utilizador) }}"
+                                data-nome="{{ m.Nome }} {{ m.Apelido }}"
+                                aria-label="Remover {{ m.Nome }} {{ m.Apelido }} do grupo" title="Remover do grupo">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                        </button>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% if e_administrador %}
+                <button type="button" class="convidar-membro" id="abrir-convite">+ Convidar membro</button>
+                {% endif %}
+            </details>
+            <nav class="filtro-meses" aria-label="Filtrar despesas do grupo por mês">
+                {% for f in [filtros.esquerda, filtros.centro, filtros.direita] %}
+                    {% if f.ativo %}
+                    <span class="ativo" aria-current="true">{{ f.texto }}</span>
+                    {% else %}
+                    <a href="{{ url_for('grupos', grupo=grupo.ID_Grupo, mes=f.mes) }}">{{ f.texto }}</a>
+                    {% endif %}
+                {% endfor %}
+            </nav>
+
+
+
+            {% if e_administrador %}
+            <dialog id="janela-convite" class="janela-transacao" aria-labelledby="titulo-convite">
+                <div class="topo-janela">
+                    <h2 id="titulo-convite">Convidar membro</h2>
+                    <button type="button" class="fechar" aria-label="Fechar">×</button>
+                </div>
+
+                <form class="formulario-simples" method="post" action="{{ url_for('convidar_membro', id_grupo=grupo.ID_Grupo) }}">
+                    <label for="email_convite">Email da pessoa a convidar:</label>
+                    <input type="email" id="email_convite" name="email" maxlength="150" required>
+
+                    <input type="submit" value="Enviar convite">
+                </form>
+            </dialog>
+
+            <dialog id="janela-remover" class="janela-transacao" aria-labelledby="titulo-remover">
+                <div class="topo-janela">
+                    <h2 id="titulo-remover">Remover membro</h2>
+                    <button type="button" class="fechar" aria-label="Fechar">×</button>
+                </div>
+
+                <p>Tem a certeza que quer remover <strong id="nome-remover"></strong> do grupo?</p>
+
+                <form id="form-remover" class="acoes-janela" method="post">
+                    <button type="button" class="cancelar">Cancelar</button>
+                    <input type="submit" class="botao-perigo" value="Remover">
+                </form>
+            </dialog>
+                <script>
+                    const janelaConvite = document.getElementById("janela-convite");
+
+                    document.getElementById("abrir-convite").addEventListener("click", function () {
+                        janelaConvite.showModal();
+                    });
+
+                    janelaConvite.querySelector(".fechar").addEventListener("click", function () {
+                        janelaConvite.close();
+                    });
+                    const janelaRemover = document.getElementById("janela-remover");
+                    const formRemover = document.getElementById("form-remover");
+                    const nomeRemover = document.getElementById("nome-remover");
+
+                    document.querySelectorAll(".remover-membro").forEach(function (botao) {
+                        botao.addEventListener("click", function () {
+                            formRemover.action = botao.dataset.url;
+                            nomeRemover.textContent = botao.dataset.nome;
+                            janelaRemover.showModal();
+                        });
+                    });
+
+                    janelaRemover.querySelectorAll(".fechar, .cancelar").forEach(function (botao) {
+                        botao.addEventListener("click", function () {
+                            janelaRemover.close();
+                        });
+                    });
+                </script>
+            {% endif %}
+
+            {% if carteiras %}
+            <dialog id="janela-transacao-grupo" class="janela-transacao" aria-labelledby="titulo-transacao-grupo">
+                <div class="topo-janela">
+                    <h2 id="titulo-transacao-grupo">Nova despesa de grupo</h2>
+                    <button type="button" class="fechar" aria-label="Fechar">×</button>
+                </div>
+
+                <form class="formulario-simples" method="post" action="{{ url_for('nova_transacao_grupo', id_grupo=grupo.ID_Grupo) }}">
+                    <label for="descricao_grupo">Descrição:</label>
+                    <input type="text" id="descricao_grupo" name="transacao" maxlength="100" placeholder="Ex.: Jantar de sábado" required>
+
+                    <label for="valor_grupo">Valor total (€):</label>
+                    <input type="number" id="valor_grupo" name="valor" step="0.01" min="0.01" required>
+
+                    <label for="data_grupo">Data:</label>
+                    <input type="date" id="data_grupo" name="data" value="{{ hoje }}" max="{{ hoje }}" required>
+
+                    <label for="categoria_grupo">Categoria:</label>
+                    <select id="categoria_grupo" name="categoria" required>
+                        <option value="" disabled selected>Escolha uma categoria</option>
+                        {% for cat in categorias %}
+                        <option value="{{ cat.ID_Categoria }}">{{ cat.Categoria }}</option>
+                        {% endfor %}
+                    </select>
+
+                    <label for="carteira_grupo">Pago com a carteira:</label>
+                    <select id="carteira_grupo" name="carteira" required>
+                        <option value="" disabled selected>Escolha uma carteira</option>
+                        {% for c in carteiras %}
+                        <option value="{{ c.ID_Carteira }}">{{ c.Carteira }} ({{ "%.2f"|format(c.Valor)|replace(".", ",") }} €)</option>
+                        {% endfor %}
+                    </select>
+
+                    <fieldset class="escolha-membros">
+                        <legend>Dividir em partes iguais por:</legend>
+                        {% for m in membros %}
+                        <label>
+                            <input type="checkbox" name="membros" value="{{ m.ID_Utilizador }}" checked>
+                            {{ m.Nome }} {{ m.Apelido }}
+                        </label>
+                        {% endfor %}
+                    </fieldset>
+
+                    <input type="submit" value="Criar despesa de grupo">
+                </form>
+            </dialog>
+
+            <script>
+                const janelaTransacaoGrupo = document.getElementById("janela-transacao-grupo");
+
+                document.getElementById("abrir-transacao-grupo").addEventListener("click", function () {
+                    janelaTransacaoGrupo.showModal();
+                });
+
+                janelaTransacaoGrupo.querySelector(".fechar").addEventListener("click", function () {
+                    janelaTransacaoGrupo.close();
+                });
+            </script>
+            {% else %}
+            <p class="aviso">Para criar despesas de grupo, crie primeiro uma <a href="{{ url_for('area_pessoal') }}">carteira</a>.</p>
+            {% endif %}
+
+
+            <h2>Transações do grupo</h2>
+            <ul class="lista-transacoes-grupo">
+                {% for t in transacoes_grupo %}
+                <li>
+                    <div class="cabecalho-transacao-grupo">
+                        <div>
+                            <strong>{{ t.Transacao }}</strong>
+                            <small>
+                                {{ t.Data.strftime('%d/%m/%Y') }} · {{ t.Categoria }} · Pago por {{ t.Nome }} {{ t.Apelido }}
+                                · {{ t.partes|selectattr('Pago')|list|length }} de {{ t.partes|length }} partes pagas
+                            </small>
+                        </div>
+                        <span class="valor-transacao-grupo">{{ "%.2f"|format(t.Valor)|replace(".", ",") }} €</span>
+                    </div>
+                    <ul class="partes">
+                        {% for p in t.partes %}
+                        <li class="{{ 'paga' if p.Pago else 'por-pagar' }}">
+                            <span>{{ p.Nome }} {{ p.Apelido }}</span>
+                            <span>{{ "%.2f"|format(p.Valor)|replace(".", ",") }} €</span>
+                            {% if p.Pago %}
+                            <span class="estado">Pago</span>
+                            {% elif p.ID_Utilizador == id_utilizador %}
+                            {% if carteiras %}
+                            <form class="pagar-parte" method="post" action="{{ url_for('pagar_parte', id_grupo=grupo.ID_Grupo, id_transacao_grupo=t.ID_Transacao_Grupo) }}">
+                                <select name="carteira" aria-label="Carteira com que vai pagar" required>
+                                    <option value="" disabled selected>Pagar com…</option>
+                                    {% for c in carteiras %}
+                                    <option value="{{ c.ID_Carteira }}">{{ c.Carteira }} ({{ "%.2f"|format(c.Valor)|replace(".", ",") }} €)</option>
+                                    {% endfor %}
+                                </select>
+                                <input type="submit" value="Pagar">
+                            </form>
+                            {% else %}
+                            <a href="{{ url_for('area_pessoal') }}">Crie uma carteira para pagar</a>
+                            {% endif %}
+                            {% else %}
+                            <span class="estado">Por pagar</span>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </li>
+                {% else %}
+                <li class="vazio">Não há despesas de grupo neste período.</li>
+                {% endfor %}
+            </ul>
+
+            {% else %}
+            <h1>Grupos</h1>
+            <p>Crie um grupo no painel ao lado ou aceite um convite para começar.</p>
+            {% endif %}
+        </section>
+    </main>
+</body>
+</html>
