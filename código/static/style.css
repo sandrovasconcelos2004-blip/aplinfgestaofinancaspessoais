@@ -245,13 +245,15 @@ header nav a:hover {
 }
 
 /* "Aceder à Conta" (ligação para o login) em destaque */
-header nav a[href$="/login"] {
+header nav a[href$="/login"],
+header nav a.botao-verde {
     background-color: var(--cor-principal);
     border-color: transparent;
     color: #ffffff;
 }
 
-header nav a[href$="/login"]:hover {
+header nav a[href$="/login"]:hover,
+header nav a.botao-verde:hover {
     background-color: var(--cor-principal-escura);
 }
 
@@ -346,6 +348,7 @@ input[type="text"],
 input[type="email"],
 input[type="password"],
 input[type="number"],
+input[type="date"],
 select {
     width: 100%;
     height: var(--altura-campo);
@@ -370,6 +373,7 @@ input[type="text"]:hover,
 input[type="email"]:hover,
 input[type="password"]:hover,
 input[type="number"]:hover,
+input[type="date"]:hover,
 select:hover {
     border-color: var(--cor-borda-hover);
 }
@@ -378,6 +382,7 @@ input[type="text"]:focus,
 input[type="email"]:focus,
 input[type="password"]:focus,
 input[type="number"]:focus,
+input[type="date"]:focus,
 select:focus {
     border-color: var(--cor-principal);
     box-shadow: 0 0 0 4px var(--cor-foco);
@@ -701,15 +706,15 @@ body > .aviso {
 }
 
 /* Secções que abrem e fecham ("Nova carteira", "Categorias") */
-.dashboard aside details {
+.dashboard details {
     border-top: 1px solid var(--cor-borda);
 }
 
-.dashboard aside details[open] {
+.dashboard details[open] {
     padding-bottom: 16px;
 }
 
-.dashboard aside summary {
+.dashboard summary {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -725,12 +730,12 @@ body > .aviso {
 }
 
 /* Remove o triângulo do browser */
-.dashboard aside summary::-webkit-details-marker {
+.dashboard summary::-webkit-details-marker {
     display: none;
 }
 
 /* Seta: aponta para a direita quando fechado e para baixo quando aberto */
-.dashboard aside summary::after {
+.dashboard summary::after {
     content: "";
     width: 8px;
     height: 8px;
@@ -742,21 +747,21 @@ body > .aviso {
     transition: transform 0.2s;
 }
 
-.dashboard aside details[open] > summary::after {
+.dashboard details[open] > summary::after {
     transform: rotate(45deg);
 }
 
-.dashboard aside summary:hover,
-.dashboard aside details[open] > summary {
+.dashboard summary:hover,
+.dashboard details[open] > summary {
     color: var(--cor-destaque);
 }
 
-.dashboard aside summary:focus-visible {
+.dashboard summary:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px var(--cor-foco);
 }
 
-.dashboard aside details[open] > :not(summary) {
+.dashboard details[open] > :not(summary) {
     animation: surgir 0.2s ease-out;
 }
 
@@ -877,6 +882,170 @@ body > .aviso {
     width: 160px;
     height: 160px;
 }
+
+/* Filtro de meses, colado por baixo do cartão do saldo */
+.saldo:has(+ .filtro-meses) {
+    margin-bottom: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.filtro-meses {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin: 0 0 24px;
+    padding: 8px;
+    border-radius: 0 0 20px 20px;
+    background-color: #073d2f;          /* o tom mais escuro do gradiente do saldo */
+    box-shadow: 0 12px 32px -12px rgba(7, 61, 47, 0.6);
+}
+
+.filtro-meses a,
+.filtro-meses span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: 12px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.filtro-meses a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+.filtro-meses a:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+}
+
+.filtro-meses .ativo {
+    background-color: #ffffff;
+    color: var(--cor-principal);
+}
+
+
+/* Botões + e − dentro do cartão do saldo */
+.saldo {
+    padding-right: 140px;   /* espaço para os botões não ficarem por cima do valor */
+}
+
+/* Botões + e −: uma pílula branca com os dois lado a lado */
+.botoes-saldo {
+    position: absolute;
+    top: 50%;
+    right: 28px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px;
+    border-radius: 999px;
+    background-color: #ffffff;
+    box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.35);
+    transform: translateY(-50%);
+}
+
+.botao-saldo {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 40px;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: none;
+    box-shadow: none;
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.botao-saldo svg {
+    display: block;           /* tira o espaço extra que o texto deixa por baixo */
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;     /* usa o verde ou o vermelho do botão */
+    stroke-width: 2.5;
+    stroke-linecap: round;
+}
+
+
+/* Linha fina a separar o + do − */
+.botao-saldo + .botao-saldo::before {
+    content: "";
+    position: absolute;
+    left: -4px;
+    top: 10px;
+    bottom: 10px;
+    width: 1px;
+    background-color: #e3e9e6;
+}
+
+.botao-receita { color: var(--cor-principal); }
+.botao-despesa { color: #c92a2a; }
+
+/* Ao passar o rato: um fundo suave da cor do sinal */
+.botao-receita:hover { background-color: #e8f4ee; }
+.botao-despesa:hover { background-color: #fdf2f2; }
+
+.botao-saldo:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px currentColor;
+}
+
+
+/* Pop-up da transação */
+.janela-transacao {
+    width: min(560px, calc(100% - 32px));
+    padding: 24px;
+    border: none;
+    border-radius: var(--raio-grande);
+    background-color: var(--cor-cartao);
+    box-shadow: var(--sombra-grande);
+    color: var(--cor-texto);
+}
+
+.janela-transacao::backdrop {
+    background-color: rgba(15, 29, 24, 0.5);
+}
+
+/* O formulário já está dentro do cartão do pop-up: tirar o seu próprio cartão */
+.janela-transacao form {
+    margin: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+}
+
+.topo-janela {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.topo-janela h2 {
+    margin: 0;
+}
+
+.fechar {
+    border: none;
+    background: none;
+    color: var(--cor-texto-suave);
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
 
 /* Formulário de nova transação */
 .dashboard section form {
@@ -1019,6 +1188,32 @@ body > .aviso {
     background-color: transparent;
 }
 
+/* Transações futuras, que ainda não mexeram no saldo */
+.tabela-transacoes tr.agendada td {
+    opacity: 0.6;
+}
+
+.tabela-transacoes tr.agendada small {
+    color: var(--cor-texto-suave);
+    font-size: 0.75rem;
+}
+
+/* Transações que se podem editar ou eliminar */
+.tabela-transacoes tr.clicavel {
+    cursor: pointer;
+}
+
+.tabela-transacoes tr.clicavel:hover td {
+    background-color: var(--cor-cartao-suave);
+}
+
+.tabela-transacoes tr.clicavel:focus-visible {
+    outline: 2px solid var(--cor-principal);
+    outline-offset: -2px;
+}
+
+
+
 .campo-password {
     position: relative;
     margin-bottom: 16px;
@@ -1051,6 +1246,480 @@ body > .aviso {
 .mostrar-password:active {
     transform: none;
 }
+
+/* --------------------------------------------------------------------------
+   Grupos
+   -------------------------------------------------------------------------- */
+
+:root {
+    --icone-grupo: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='9' cy='7' r='4'/%3E%3Cpath d='M22 21v-2a4 4 0 0 0-3-3.87'/%3E%3Cpath d='M16 3.13a4 4 0 0 1 0 7.75'/%3E%3C/svg%3E");
+}
+
+/* Lista de grupos: mesmo estilo da lista de carteiras, com ícone de pessoas */
+.lista-grupos li::before {
+    -webkit-mask-image: var(--icone-grupo);
+    mask-image: var(--icone-grupo);
+}
+
+/* Linha com a data de criação e a função, por baixo do nome do grupo */
+.detalhes-grupo {
+    margin: -8px 0 20px;
+    color: var(--cor-texto-suave);
+    font-size: 0.9rem;
+}
+
+/* Subtítulos da coluna principal ("Membros", "Convidar membro") */
+.dashboard section h2 {
+    margin: 0 0 12px;
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+/* Cartão verde dos membros, colado à faixa que abre a lista */
+.saldo:has(+ .bloco-membros) {
+    margin-bottom: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.dashboard .bloco-membros {
+    margin: 0 0 24px;
+    padding: 0 16px;
+    border: none;
+    border-radius: 0 0 20px 20px;
+    background-color: #073d2f;          /* o mesmo verde-escuro do filtro de meses */
+    box-shadow: 0 12px 32px -12px rgba(7, 61, 47, 0.6);
+}
+
+.dashboard .bloco-membros[open] {
+    padding-bottom: 12px;
+}
+
+/* Só a seta, ao centro e a branco */
+.dashboard details.bloco-membros > summary {
+    justify-content: center;
+    padding: 10px 4px;
+    color: #ffffff;
+}
+
+/* Lista dentro da faixa verde */
+.bloco-membros .lista-membros {
+    max-height: none;
+    margin: 0;
+    padding: 8px 0 0;
+    background: none;
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: none;
+}
+
+.bloco-membros .lista-membros li {
+    color: rgba(255, 255, 255, 0.92);
+}
+
+.bloco-membros .lista-membros li::before {
+    background-color: rgba(255, 255, 255, 0.5);
+}
+
+.bloco-membros .lista-membros small {
+    color: rgba(255, 255, 255, 0.65);
+}
+
+/* Com o filtro de meses por baixo, a faixa dos membros fica no meio do cartão */
+.dashboard .bloco-membros:has(+ .filtro-meses) {
+    margin-bottom: 0;
+    border-radius: 0;
+}
+
+/* Linha fina a separar a faixa dos membros do filtro */
+.bloco-membros + .filtro-meses {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+
+/* "+ Convidar membro", no fim da lista de membros (fundo verde-escuro) */
+.convidar-membro {
+    width: 100%;
+    height: 38px;
+    margin-top: 8px;
+    border: 1px solid #10855f;
+    border-radius: var(--raio);
+    background: none;
+    box-shadow: none;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.convidar-membro:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+}
+
+.convidar-membro:focus-visible {
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+}
+
+
+/* Botão "X" para remover um membro */
+.remover-membro {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    margin-left: 4px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    box-shadow: none;
+    color: #ff8a80;   /* vermelho claro: o vermelho escuro quase não se via no verde-escuro */
+    cursor: pointer;
+}
+
+.remover-membro svg {
+    display: block;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+}
+
+.remover-membro:hover {
+    background-color: rgba(255, 138, 128, 0.18);
+}
+
+.remover-membro:focus-visible {
+    outline: 2px solid #ff8a80;
+    outline-offset: 1px;
+}
+
+/* Pop-up de confirmação: botões lado a lado, à direita */
+.janela-transacao form.acoes-janela {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.acoes-janela .cancelar,
+.acoes-janela .editar,
+.acoes-janela .botao-perigo {
+    width: auto;
+    height: 42px;
+    padding: 0 18px;
+    border-radius: var(--raio);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.acoes-janela .cancelar,
+.acoes-janela .editar {
+    border: 1px solid var(--cor-borda-forte);
+    background-color: var(--cor-cartao);
+    color: var(--cor-texto);
+}
+
+.acoes-janela .botao-perigo {
+    border: none;
+    background-color: #c92a2a;
+    color: #ffffff;
+}
+
+.acoes-janela .botao-perigo:hover {
+    background-color: #a51f1f;
+}
+
+
+/* Texto escondido no ecrã, mas lido pelos leitores de ecrã */
+.so-leitor {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+
+
+/* Formulário com um só campo (convidar): uma coluna, mesmo em ecrãs largos */
+.dashboard section form.formulario-simples {
+    display: flex;
+}
+
+/* Convites pendentes */
+.lista-convites {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0 0 16px;
+    padding: 0;
+    list-style: none;
+}
+
+.lista-convites li {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    background-color: var(--cor-destaque-fundo);
+    border-radius: var(--raio);
+    color: var(--cor-texto-suave);
+    font-size: 0.875rem;
+}
+
+.lista-convites strong {
+    display: block;
+    color: var(--cor-texto);
+    font-size: 0.9375rem;
+}
+
+.acoes-convite {
+    display: flex;
+    gap: 8px;
+}
+
+.acoes-convite form {
+    flex: 1;
+}
+
+/* Botões pequenos: "Aceitar" em destaque, "Recusar" discreto */
+.dashboard aside .acoes-convite input[type="submit"] {
+    width: 100%;
+    height: 34px;
+    margin: 0;
+    padding: 0 12px;
+    font-size: 0.8125rem;
+}
+
+.dashboard aside .acoes-convite form:first-child input[type="submit"] {
+    background-color: var(--cor-principal);
+    color: #ffffff;
+}
+
+.dashboard aside .acoes-convite form:first-child input[type="submit"]:hover {
+    background-color: var(--cor-principal-escura);
+}
+
+.dashboard aside .acoes-convite form:last-child input[type="submit"] {
+    background-color: var(--cor-cartao);
+    border-color: var(--cor-borda-forte);
+    color: var(--cor-texto);
+}
+
+.dashboard aside .acoes-convite form:last-child input[type="submit"]:hover {
+    background-color: var(--cor-cartao-suave);
+}
+
+/* Escolha dos membros de uma transação de grupo (checkboxes) */
+.escolha-membros {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0 0 16px;
+    padding: 14px 16px;
+    border: 1px solid var(--cor-borda-forte);
+    border-radius: var(--raio);
+}
+
+.escolha-membros legend {
+    padding: 0 6px;
+    color: var(--cor-texto);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.escolha-membros label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-weight: 400;
+    cursor: pointer;
+}
+
+.escolha-membros input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--cor-principal);
+}
+
+/* Lista de transações de grupo (um cartão por transação) */
+.lista-transacoes-grupo {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0 0 24px;
+    padding: 0;
+    list-style: none;
+}
+
+.lista-transacoes-grupo > li {
+    padding: 16px;
+    background-color: var(--cor-cartao);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-grande);
+    box-shadow: var(--sombra-pequena);
+}
+
+.lista-transacoes-grupo > li.vazio {
+    padding: 32px 16px;
+    border-style: dashed;
+    box-shadow: none;
+    color: var(--cor-texto-suave);
+    text-align: center;
+}
+
+.cabecalho-transacao-grupo {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.cabecalho-transacao-grupo strong {
+    display: block;
+}
+
+.cabecalho-transacao-grupo small {
+    color: var(--cor-texto-suave);
+    font-size: 0.8125rem;
+}
+
+.valor-transacao-grupo {
+    font-size: 1.125rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Partes de cada membro: nome | valor | estado ou botão */
+.partes {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 10px 0 0;
+    border-top: 1px solid var(--cor-borda);
+    list-style: none;
+}
+
+.partes li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+    font-size: 0.9rem;
+}
+
+.partes li > span:nth-child(2) {
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+}
+
+.partes .estado {
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.partes .paga .estado {
+    background-color: var(--cor-destaque-fundo);
+    color: var(--cor-receita);
+}
+
+.partes .por-pagar .estado {
+    background-color: var(--cor-erro-fundo);
+    color: var(--cor-despesa);
+}
+
+/* Formulário "Pagar com…" dentro de uma parte:
+   lista e botão colados, como um só controlo  [ Carteira ▾ | Pagar ]
+   (anula o layout em grelha do formulário de nova transação) */
+.dashboard section .partes form.pagar-parte {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: var(--raio);
+    box-shadow: var(--sombra-pequena);
+}
+
+.dashboard section .partes form.pagar-parte select {
+    position: relative;
+    width: auto;
+    min-width: 150px;
+    max-width: 210px;
+    height: 34px;
+    margin: 0;
+    padding: 0 30px 0 12px;
+    border-right: 0;
+    border-radius: var(--raio) 0 0 var(--raio);
+    box-shadow: none;
+    font-size: 0.875rem;
+    background-position: right 10px center;
+    background-size: 14px;
+}
+
+/* Anel de foco por cima do botão */
+.dashboard section .partes form.pagar-parte select:focus {
+    z-index: 1;
+    box-shadow: 0 0 0 3px var(--cor-foco);
+}
+
+.dashboard section .partes form.pagar-parte input[type="submit"] {
+    height: 34px;
+    margin: 0;
+    padding: 0 16px;
+    border-radius: 0 var(--raio) var(--raio) 0;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    font-size: 0.875rem;
+    white-space: nowrap;
+}
+
+.dashboard section .partes form.pagar-parte input[type="submit"]:focus-visible {
+    box-shadow: 0 0 0 3px var(--cor-foco);
+}
+
+/* Telemóvel: o formulário passa para uma linha própria, por baixo do nome e do valor */
+@media (max-width: 560px) {
+    .partes li {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .partes li > form {
+        grid-column: 1 / -1;
+    }
+
+    .dashboard section .partes form.pagar-parte {
+        display: flex;
+    }
+
+    .dashboard section .partes form.pagar-parte select {
+        flex: 1;
+        max-width: none;
+        height: 40px;
+        font-size: 1rem; /* 16px evita o zoom automático do iPhone */
+    }
+
+    .dashboard section .partes form.pagar-parte input[type="submit"] {
+        height: 40px;
+    }
+}
+
 
 
 
