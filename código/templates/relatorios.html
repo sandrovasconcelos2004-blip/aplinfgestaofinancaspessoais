@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="pt-pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Relatórios</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        Bem-vindo(a), <strong>{{ nome }}</strong>
+        <nav>
+           <a href="{{ url_for('area_pessoal') }}" class="botao-verde">Carteiras</a>
+           <a href="{{ url_for('grupos') }}" class="botao-verde">Grupos</a>
+           <a href="{{ url_for('logout') }}">Logout</a>
+        </nav>
+    </header>
+
+    <main class="dashboard">
+
+        <!-- Coluna esquerda: seleção de carteira (todas por omissão) -->
+        <aside>
+            <h2>As minhas carteiras</h2>
+            <ul class="lista-carteiras">
+                <li class="{{ 'ativa' if carteira is none }}">
+                    <a href="{{ url_for('relatorios', mes=mes_ativo) }}">Todas as carteiras</a>
+                    <span>{{ "%.2f"|format(saldo_total)|replace(".", ",") }} €</span>
+                </li>
+                {% for c in carteiras %}
+                <li class="{{ 'ativa' if carteira and c.ID_Carteira == carteira.ID_Carteira }}">
+                    <a href="{{ url_for('relatorios', carteira=c.ID_Carteira, mes=mes_ativo) }}">{{ c.Carteira }}</a>
+                    <span>{{ "%.2f"|format(c.Valor)|replace(".", ",") }} €</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </aside>
+
+        <!-- Coluna direita: quadros do relatório -->
+        <section>
+            {% for categoria, mensagem in get_flashed_messages(with_categories=true) %}
+            <p class="aviso {{ categoria }}">{{ mensagem }}</p>
+            {% endfor %}
+
+            <h1>{{ carteira.Carteira if carteira else "Todas as carteiras" }}</h1>
+
+            <!-- Primeiro quadro: total de despesas, total de receitas e lucro/prejuízo -->
+            <div class="quadro-resumo">
+                <div class="bloco-resumo">
+                    <span class="rotulo-resumo">Total de despesas</span>
+                    <strong class="valor-resumo valor-despesa">−{{ "%.2f"|format(total_despesas)|replace(".", ",") }} €</strong>
+                </div>
+                <div class="bloco-resumo">
+                    <span class="rotulo-resumo">Total de receitas</span>
+                    <strong class="valor-resumo valor-receita">+{{ "%.2f"|format(total_receitas)|replace(".", ",") }} €</strong>
+                </div>
+                <div class="bloco-resumo">
+                    <span class="rotulo-resumo">
+                        Lucro / Prejuízo
+                        <small class="etiqueta-resultado {{ 'lucro' if resultado_liquido > 0 else ('prejuizo' if resultado_liquido < 0 else 'neutro') }}">
+                            {{ 'Lucro' if resultado_liquido > 0 else ('Prejuízo' if resultado_liquido < 0 else 'Neutro') }}
+                        </small>
+                    </span>
+                    <strong class="valor-resumo {{ 'valor-receita' if resultado_liquido > 0 else ('valor-despesa' if resultado_liquido < 0 else '') }}">
+                        {{ '+' if resultado_liquido > 0 else ('−' if resultado_liquido < 0 else '') }}{{ "%.2f"|format(resultado_liquido|abs)|replace(".", ",") }} €
+                    </strong>
+                </div>
+            </div>
+
+            <nav class="filtro-meses" aria-label="Filtrar relatório por mês">
+                {% for f in [filtros.esquerda, filtros.centro, filtros.direita] %}
+                    {% if f.ativo %}
+                    <span class="ativo" aria-current="true">{{ f.texto }}</span>
+                    {% else %}
+                    <a href="{{ url_for('relatorios', carteira=carteira.ID_Carteira if carteira else none, mes=f.mes) }}">{{ f.texto }}</a>
+                    {% endif %}
+                {% endfor %}
+            </nav>
+
+            <!-- Segundo quadro: gráfico circular com as despesas por categoria -->
+            <div class="quadro-relatorio">
+                <h2>Despesas por categoria</h2>
+
+                {% if despesas_categorias %}
+                <div class="conteudo-categorias">
+                    <div class="grafico-circular-contentor">
+                        <svg class="grafico-circular" viewBox="0 0 42 42" role="img" aria-label="Gráfico circular de despesas por categoria">
+                            <circle class="anel-fundo" cx="21" cy="21" r="15.91549431" fill="transparent" stroke-width="7"></circle>
+                            <g transform="rotate(-90 21 21)">
+                                {% for cat in despesas_categorias %}
+                                <circle class="fatia-grafico"
+                                        cx="21" cy="21" r="15.91549431"
+                                        fill="transparent"
+                                        stroke="{{ cat.Cor }}"
+                                        stroke-width="7"
+                                        stroke-dasharray="{{ cat.Fatia }} {{ 100 - cat.Fatia }}"
+                                        stroke-dashoffset="{{ 0 if cat.Inicio == 0 else -cat.Inicio }}">
+                                    <title>{{ cat.Categoria }}: {{ "%.2f"|format(cat.Total)|replace(".", ",") }} € ({{ "%.1f"|format(cat.Percentagem)|replace(".", ",") }}%)</title>
+                                </circle>
+                                {% endfor %}
+                            </g>
+                        </svg>
+                        <div class="centro-grafico">
+                            <span>Total</span>
+                            <strong>{{ "%.2f"|format(total_despesas)|replace(".", ",") }} €</strong>
+                        </div>
+                    </div>
+
+                    <ul class="legenda-categorias">
+                        {% for cat in despesas_categorias %}
+                        <li>
+                            <span class="cor-categoria" style="background-color: {{ cat.Cor }}"></span>
+                            <span class="nome-categoria">{{ cat.Categoria }}</span>
+                            <span class="percentagem-categoria">{{ "%.1f"|format(cat.Percentagem)|replace(".", ",") }}%</span>
+                            <strong class="valor-categoria">{{ "%.2f"|format(cat.Total)|replace(".", ",") }} €</strong>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% else %}
+                <p class="sem-dados-relatorio">Não há despesas registadas neste período.</p>
+                {% endif %}
+            </div>
+        </section>
+    </main>
+</body>
+</html>
+

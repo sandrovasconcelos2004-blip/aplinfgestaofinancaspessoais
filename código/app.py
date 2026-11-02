@@ -39,6 +39,20 @@ CATEGORIA_SALDO_INICIAL = "Saldo Inicial"
 FUNCAO_ADMINISTRADOR = "Administrador"
 FUNCAO_MEMBRO = "Membro"
 
+# Paleta de cores para as fatias do gráfico circular de despesas por categoria
+CORES_GRAFICO = (
+    "#0f7b5f",
+    "#1971c2",
+    "#e67700",
+    "#6741d9",
+    "#c2255c",
+    "#0c8599",
+    "#2b8a3e",
+    "#d9480f",
+    "#5c940d",
+    "#862e9c",
+)
+
 
 
 def gerar_token(utilizador):
@@ -1362,6 +1376,139 @@ def pagar_parte(id_grupo, id_transacao_grupo):
 
     flash("A sua parte foi paga.", "sucesso")
     return redirect(destino)
+
+@app.route("/relatorios")
+def relatorios():
+    """Página de relatórios financeiros do utilizador autenticado.
+
+    Apresenta o resumo do período escolhido (total de despesas, total de
+    receitas e lucro/prejuízo) e um gráfico circular com a distribuição das
+    despesas por categoria, para todas as carteiras ou para uma carteira
+    específica (?carteira=ID), excluindo o saldo inicial.
+    """
+    if "id_utilizador" not in session:
+        return redirect(url_for("login"))
+
+    id_utilizador = session["id_utilizador"]
+    id_carteira = request.args.get("carteira", type=int)
+    inicio, fim, filtros = obter_filtro_meses(request.args.get("mes", ""))
+    mes_ativo = "futuro" if filtros["direita"]["ativo"] else filtros["centro"]["mes"]
+
+    carteira = None
+    total_receitas = Decimal("0.00")
+    total_despesas = Decimal("0.00")
+    despesas_categorias = []
+
+    ligacao = obter_ligacao()
+    try:
+        with ligacao.cursor() as cursor:
+            # Aplicar ao saldo as transações agendadas cuja data já chegou
+            aplicar_transacoes_agendadas(cursor, id_utilizador)
+            ligacao.commit()
+
+            # Carteiras do utilizador para a barra lateral
+            cursor.execute(
+                "SELECT ID_Carteira, Carteira, Valor FROM Carteiras "
+                "WHERE ID_Utilizador = %s ORDER BY Carteira",
+                (id_utilizador,),
+            )
+            carteiras = cursor.fetchall()
+            saldo_total = sum((c["Valor"] for c in carteiras), Decimal("0.00"))
+
+            if id_carteira is not None:
+                # Controlo de acesso: só o dono pode ver o relatório da carteira
+                carteira = obter_carteira_do_utilizador(cursor, id_carteira, id_utilizador)
+                if carteira is None:
+                    abort(404)
+
+            # Condições comuns às consultas do relatório (período, carteira e exclusão do saldo inicial)
+            condicoes = (
+                "WHERE w.ID_Utilizador = %s "
+                "AND (c.Categoria IS NULL OR c.Categoria <> %s) "
+                "AND t.Data >= %s "
+            )
+            parametros = [id_utilizador, CATEGORIA_SALDO_INICIAL, inicio]
+            if fim is not None:
+                condicoes += "AND t.Data < %s "
+                parametros.append(fim)
+            if id_carteira is not None:
+                condicoes += "AND t.ID_Carteira = %s "
+                parametros.append(id_carteira)
+
+            # 1. Totais de receitas e despesas do período
+            cursor.execute(
+                "SELECT "
+                "COALESCE(SUM(CASE WHEN t.Tipo = 'receita' THEN t.Valor ELSE 0 END), 0) AS Total_Receitas, "
+                "COALESCE(SUM(CASE WHEN t.Tipo = 'despesa' THEN t.Valor ELSE 0 END), 0) AS Total_Despesas "
+                "FROM Transacoes t "
+                "JOIN Carteiras w ON w.ID_Carteira = t.ID_Carteira "
+                "LEFT JOIN Categorias c ON c.ID_Categoria = t.ID_Categoria "
+                + condicoes,
+                parametros,
+            )
+            totais = cursor.fetchone()
+            total_receitas = Decimal(totais["Total_Receitas"]).quantize(Decimal("0.01"))
+            total_despesas = Decimal(totais["Total_Despesas"]).quantize(Decimal("0.01"))
+
+            # 2. Despesas agrupadas por categoria para o gráfico circular
+            cursor.execute(
+                "SELECT COALESCE(c.Categoria, 'Sem categoria') AS Categoria, SUM(t.Valor) AS Total "
+                "FROM Transacoes t "
+                "JOIN Carteiras w ON w.ID_Carteira = t.ID_Carteira "
+                "LEFT JOIN Categorias c ON c.ID_Categoria = t.ID_Categoria "
+                + condicoes
+                + "AND t.Tipo = 'despesa' "
+                "GROUP BY c.ID_Categoria, c.Categoria "
+                "ORDER BY Total DESC, Categoria",
+                parametros,
+            )
+            linhas_categorias = cursor.fetchall()
+
+            acumulado = 0.0
+            for indice, linha in enumerate(linhas_categorias):
+                valor_cat = Decimal(linha["Total"]).quantize(Decimal("0.01"))
+                percentagem = (
+                    (valor_cat * Decimal("100") / total_despesas).quantize(Decimal("0.1"))
+                    if total_despesas > 0
+                    else Decimal("0.0")
+                )
+                if indice == len(linhas_categorias) - 1:
+                    fatia = max(0.0, round(100.0 - acumulado, 4))
+                else:
+                    fatia = min(
+                        max(0.0, round(100.0 - acumulado, 4)),
+                        round(float(valor_cat * Decimal("100") / total_despesas), 4),
+                    )
+                despesas_categorias.append(
+                    {
+                        "Categoria": linha["Categoria"],
+                        "Total": valor_cat,
+                        "Percentagem": percentagem,
+                        "Fatia": fatia,
+                        "Inicio": round(acumulado, 4),
+                        "Cor": CORES_GRAFICO[indice % len(CORES_GRAFICO)],
+                    }
+                )
+                acumulado += fatia
+    finally:
+        ligacao.close()
+
+    resultado_liquido = total_receitas - total_despesas
+
+    return render_template(
+        "relatorios.html",
+        nome=session["nome"],
+        carteiras=carteiras,
+        carteira=carteira,
+        saldo_total=saldo_total,
+        total_despesas=total_despesas,
+        total_receitas=total_receitas,
+        resultado_liquido=resultado_liquido,
+        despesas_categorias=despesas_categorias,
+        filtros=filtros,
+        mes_ativo=mes_ativo,
+    )
+
 
 @app.route("/logout")
 def logout():

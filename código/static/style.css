@@ -1727,6 +1727,262 @@ body > .aviso {
    10. Ecrãs médios e pequenos
    -------------------------------------------------------------------------- */
 
+.quadro-resumo {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin: 0 0 24px;
+    padding: 24px 28px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #11845f 0%, #0b5e47 55%, #073d2f 100%);
+    box-shadow: 0 12px 32px -12px rgba(7, 61, 47, 0.6);
+}
+
+.quadro-resumo::before,
+.quadro-resumo::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.07);
+}
+
+.quadro-resumo::before {
+    top: -90px;
+    right: -50px;
+    width: 220px;
+    height: 220px;
+}
+
+.quadro-resumo::after {
+    right: 90px;
+    bottom: -90px;
+    width: 160px;
+    height: 160px;
+}
+
+.quadro-resumo:has(+ .filtro-meses) {
+    margin-bottom: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.bloco-resumo {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+    padding: 14px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 14px;
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.rotulo-resumo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.valor-resumo {
+    color: #ffffff;
+    font-size: clamp(1.25rem, 2.4vw, 1.75rem);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.valor-resumo.valor-receita {
+    color: #8ce9c3;
+}
+
+.valor-resumo.valor-despesa {
+    color: #ffa8a8;
+}
+
+.etiqueta-resultado {
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.etiqueta-resultado.lucro {
+    background-color: rgba(140, 233, 195, 0.2);
+    color: #8ce9c3;
+}
+
+.etiqueta-resultado.prejuizo {
+    background-color: rgba(255, 168, 168, 0.22);
+    color: #ffa8a8;
+}
+
+.etiqueta-resultado.neutro {
+    background-color: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+}
+
+.quadro-relatorio {
+    padding: 24px;
+    background-color: var(--cor-cartao);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-grande);
+    box-shadow: var(--sombra-pequena);
+}
+
+.quadro-relatorio h2 {
+    margin: 0 0 20px;
+}
+
+.conteudo-categorias {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    align-items: center;
+    gap: 32px;
+}
+
+.grafico-circular-contentor {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    margin: 0 auto;
+}
+
+.grafico-circular {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.anel-fundo {
+    stroke: var(--cor-cartao-suave);
+}
+
+.fatia-grafico {
+    cursor: pointer;
+    transition: opacity 0.15s, stroke-width 0.15s;
+}
+
+.fatia-grafico:hover {
+    opacity: 0.88;
+    stroke-width: 8;
+}
+
+.centro-grafico {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 36px;
+    text-align: center;
+    pointer-events: none;
+}
+
+.centro-grafico span {
+    color: var(--cor-texto-suave);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.centro-grafico strong {
+    color: var(--cor-texto);
+    font-size: 1.125rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+
+.legenda-categorias {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.legenda-categorias li {
+    display: grid;
+    grid-template-columns: 12px minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background-color: var(--cor-cartao-suave);
+    border-radius: var(--raio);
+    font-size: 0.9375rem;
+}
+
+.cor-categoria {
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.nome-categoria {
+    overflow: hidden;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.percentagem-categoria {
+    color: var(--cor-texto-suave);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.valor-categoria {
+    min-width: 84px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.sem-dados-relatorio {
+    margin: 0;
+    padding: 40px 16px;
+    border: 1px dashed var(--cor-borda-forte);
+    border-radius: var(--raio);
+    color: var(--cor-texto-suave);
+    text-align: center;
+}
+
+@media (max-width: 720px) {
+    .quadro-resumo {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+        padding: 20px;
+    }
+
+    .conteudo-categorias {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 24px;
+    }
+}
+
 /* Tablet e telemóvel: dashboard numa só coluna */
 @media (max-width: 900px) {
     .dashboard {
