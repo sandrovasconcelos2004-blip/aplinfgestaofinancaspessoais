@@ -1,4 +1,4 @@
-# Projeto: Sistema de Gestão Financeira Pessoal - Finances4You
+# Projeto: Finances4You
 Unidade Curricular: Aplicações Informáticas \
 Equipa:
 - **Filipe Santos**, 2240582
