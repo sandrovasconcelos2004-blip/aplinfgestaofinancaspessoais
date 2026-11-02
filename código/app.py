@@ -2,12 +2,13 @@
 
 Este módulo define o servidor Flask principal, configurando as rotas para
 autenticação (registo e login), navegação, gestão de sessão de utilizadores
-e gestão de carteiras e transações.
+e gestão de carteiras e transações e grupos.
 """
 
 
 import os
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_DOWN, Decimal, InvalidOperation
+from datetime import date, datetime, time, timedelta
 import pymysql
 from dotenv import load_dotenv
 from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
@@ -33,6 +34,11 @@ serializador = URLSafeTimedSerializer(app.secret_key, salt="recuperar-password")
 
 # Categoria pré-definida usada apenas no registo do valor inicial das carteiras
 CATEGORIA_SALDO_INICIAL = "Saldo Inicial"
+
+# Funções dos membros de um grupo (têm de existir na tabela Funcoes)
+FUNCAO_ADMINISTRADOR = "Administrador"
+FUNCAO_MEMBRO = "Membro"
+
 
 
 def gerar_token(utilizador):
@@ -118,6 +124,91 @@ def obter_categoria_do_utilizador(cursor, id_categoria, id_utilizador):
         (id_categoria, id_utilizador, CATEGORIA_SALDO_INICIAL),
     )
     return cursor.fetchone()
+
+def obter_grupo_do_utilizador(cursor, id_grupo, id_utilizador):
+    """Devolve o grupo, com a função do utilizador nele, se o utilizador for membro.
+
+    Devolve None se o grupo não existir ou se o utilizador não pertencer a ele.
+    """
+    cursor.execute(
+        "SELECT g.*, f.Funcao FROM Grupos g "
+        "JOIN Membro_Grupo m ON m.ID_Grupo = g.ID_Grupo "
+        "JOIN Funcoes f ON f.ID_Funcao = m.ID_Funcao "
+        "WHERE g.ID_Grupo = %s AND m.ID_Utilizador = %s",
+        (id_grupo, id_utilizador),
+    )
+    return cursor.fetchone()
+
+def aplicar_transacoes_agendadas(cursor, id_utilizador):
+    """Aplica ao saldo das carteiras do utilizador as transações agendadas cuja data já chegou."""
+    cursor.execute(
+        "SELECT t.ID_Transacao, t.Tipo, t.Valor, t.ID_Carteira FROM Transacoes t "
+        "JOIN Carteiras c ON c.ID_Carteira = t.ID_Carteira "
+        "WHERE c.ID_Utilizador = %s AND t.Aplicada = FALSE AND t.Data <= NOW() "
+        "ORDER BY t.Data",
+        (id_utilizador,),
+    )
+    for t in cursor.fetchall():
+        # Marcar primeiro: se outro pedido já a aplicou, rowcount é 0 e não se aplica duas vezes
+        cursor.execute(
+            "UPDATE Transacoes SET Aplicada = TRUE WHERE ID_Transacao = %s AND Aplicada = FALSE",
+            (t["ID_Transacao"],),
+        )
+        if cursor.rowcount == 0:
+            continue
+        variacao = t["Valor"] if t["Tipo"] == "receita" else -t["Valor"]
+        cursor.execute(
+            "UPDATE Carteiras SET Valor = Valor + %s WHERE ID_Carteira = %s",
+            (variacao, t["ID_Carteira"]),
+        )
+
+# Expressão SQL: a transação t está ligada a uma despesa de grupo?
+SQL_DE_GRUPO = (
+    "(EXISTS (SELECT 1 FROM Transacoes_Grupo g WHERE g.ID_Transacao_Pessoal = t.ID_Transacao) "
+    "OR EXISTS (SELECT 1 FROM Membros_Transacoes_Grupo p "
+    "WHERE p.ID_Transacao_Pagamento = t.ID_Transacao OR p.ID_Transacao_Recebimento = t.ID_Transacao))"
+)
+
+
+def obter_transacao_do_utilizador(cursor, id_transacao, id_utilizador):
+    """Devolve a transação se estiver numa carteira do utilizador, ou None caso contrário.
+
+    FOR UPDATE bloqueia a linha até ao commit, para não ser alterada duas vezes ao mesmo tempo.
+    """
+    cursor.execute(
+        "SELECT t.*, c.Categoria, " + SQL_DE_GRUPO + " AS De_Grupo FROM Transacoes t "
+        "JOIN Carteiras w ON w.ID_Carteira = t.ID_Carteira "
+        "LEFT JOIN Categorias c ON c.ID_Categoria = t.ID_Categoria "
+        "WHERE t.ID_Transacao = %s AND w.ID_Utilizador = %s FOR UPDATE",
+        (id_transacao, id_utilizador),
+    )
+    return cursor.fetchone()
+
+
+def transacao_bloqueada(transacao):
+    """Transações de grupo e o saldo inicial não podem ser editados nem eliminados."""
+    return bool(transacao["De_Grupo"]) or transacao["Categoria"] == CATEGORIA_SALDO_INICIAL
+
+
+def efeito_no_saldo(tipo, valor):
+    """Quanto a transação soma ao saldo: positivo numa receita, negativo numa despesa."""
+    return valor if tipo == "receita" else -valor
+
+
+
+def dividir_em_partes(valor, numero_partes):
+    """Divide um valor em partes iguais, arredondadas ao cêntimo.
+
+    Os cêntimos que sobram da divisão são dados, um a um, às primeiras partes,
+    para que a soma das partes seja sempre igual ao valor total.
+    Ex.: 50,00 por 3 -> [16,67, 16,67, 16,66]
+    """
+    parte = (valor / numero_partes).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+    cents_que_sobram = int((valor - parte * numero_partes) * 100)
+    return [
+        parte + Decimal("0.01") if indice < cents_que_sobram else parte
+        for indice in range(numero_partes)
+    ]
 
 
 @app.route("/registo", methods=["GET", "POST"])
@@ -205,6 +296,66 @@ def login():
     # Apresentar o formulário de login para pedidos GET ou falha de autenticação
     return render_template("login.html")
 
+def mes_anterior(ano_mes):
+    ano, mes = ano_mes
+    return (ano - 1, 12) if mes == 1 else (ano, mes - 1)
+
+
+def mes_seguinte(ano_mes):
+    ano, mes = ano_mes
+    return (ano + 1, 1) if mes == 12 else (ano, mes + 1)
+
+
+def obter_filtro_meses(pedido, com_futuro=True):
+    """Período a mostrar e os três botões do filtro de datas.
+
+    pedido: valor de ?mes= no URL ("AAAA-MM", "futuro" ou vazio = mês atual).
+    com_futuro: False para não mostrar o botão "Futuro" (ex.: página dos grupos).
+    Devolve (inicio, fim, filtros). fim é None no "futuro" (sem limite).
+    """
+    hoje = date.today()
+    atual = (hoje.year, hoje.month)
+    passado = mes_anterior(atual)
+
+    def opcao(ano_mes, ativo=False):
+        if ano_mes == atual:
+            texto = "Mês atual"
+        elif ano_mes == passado:
+            texto = "Mês passado"
+        else:
+            texto = f"{ano_mes[1]:02d}/{ano_mes[0]}"
+        # O mês atual não leva ?mes= no URL, por ser o valor por omissão
+        valor = None if ano_mes == atual else f"{ano_mes[0]}-{ano_mes[1]:02d}"
+        return {"texto": texto, "mes": valor, "ativo": ativo}
+
+    futuro = {"texto": "Futuro", "mes": "futuro", "ativo": com_futuro and pedido == "futuro"}
+
+    if com_futuro and pedido == "futuro":
+        # A partir de amanhã às 00:00, ou seja, tudo o que é depois de hoje
+        inicio = hoje + timedelta(days=1)
+        return inicio, None, {"esquerda": opcao(passado), "centro": opcao(atual), "direita": futuro}
+
+    try:
+        data_pedida = datetime.strptime(pedido, "%Y-%m")
+        escolhido = (data_pedida.year, data_pedida.month)
+    except ValueError:
+        escolhido = atual          # sem ?mes= ou valor inválido
+    if escolhido > atual:
+        escolhido = atual          # meses futuros veem-se pelo botão "Futuro"
+
+    inicio = date(*escolhido, 1)
+    fim = date(*mes_seguinte(escolhido), 1)
+    if escolhido == atual:
+        fim = hoje + timedelta(days=1)
+       # o resto do mês fica no "Futuro"
+       # Sem "Futuro", o mês atual é o último botão (à direita)
+    if not com_futuro and escolhido == atual:
+        return inicio, fim, {"esquerda": opcao(mes_anterior(passado)), "centro": opcao(passado), "direita": opcao(atual, ativo=True)}
+
+
+    direita = futuro if escolhido == atual else opcao(atual)
+    return inicio, fim, {"esquerda": opcao(mes_anterior(escolhido)), "centro": opcao(escolhido, ativo=True), "direita": direita}
+
 
 
 @app.route("/area_pessoal")
@@ -221,12 +372,18 @@ def area_pessoal():
     id_utilizador = session["id_utilizador"]
     # Carteira pedida no URL; None se não vier ou não for um número
     id_carteira = request.args.get("carteira", type=int)
+    inicio, fim, filtros = obter_filtro_meses(request.args.get("mes", ""))
+
     carteira = None
     transacoes = []
 
     ligacao = obter_ligacao()
     try:
         with ligacao.cursor() as cursor:
+            # Aplicar ao saldo as transações agendadas cuja data já chegou
+            aplicar_transacoes_agendadas(cursor, id_utilizador)
+            ligacao.commit()
+
             # Obter apenas as carteiras do utilizador da sessão
             cursor.execute(
                 "SELECT ID_Carteira, Carteira, Valor FROM Carteiras "
@@ -248,15 +405,23 @@ def area_pessoal():
                 if carteira is None:
                     abort(404)
 
-                # Transações da mais recente para a mais antiga, com o nome da categoria
-                cursor.execute(
-                    "SELECT t.*, c.Categoria FROM Transacoes t "
+                # Transações do período escolhido, da mais recente para a mais antiga
+                sql = (
+                    "SELECT t.*, c.Categoria, " + SQL_DE_GRUPO + " AS De_Grupo FROM Transacoes t "
                     "LEFT JOIN Categorias c ON c.ID_Categoria = t.ID_Categoria "
-                    "WHERE t.ID_Carteira = %s "
-                    "ORDER BY t.Data DESC, t.ID_Transacao DESC",
-                    (id_carteira,),
+                    "WHERE t.ID_Carteira = %s AND t.Data >= %s "
                 )
+                parametros = [id_carteira, inicio]
+                if fim is not None:
+                    sql += "AND t.Data < %s "
+                    parametros.append(fim)
+                sql += "ORDER BY t.Data DESC, t.ID_Transacao DESC"
+                cursor.execute(sql, parametros)
                 transacoes = cursor.fetchall()
+                for t in transacoes:
+                    t["Bloqueada"] = transacao_bloqueada(t)
+
+
     finally:
         ligacao.close()
 
@@ -267,6 +432,8 @@ def area_pessoal():
         carteira=carteira,
         transacoes=transacoes,
         categorias=categorias,
+        filtros=filtros,
+        hoje=date.today().isoformat(),
     )
 
 
@@ -348,6 +515,8 @@ def nova_transacao(id_carteira):
     tipo = request.form["tipo"]
     valor = converter_valor(request.form["valor"])
     id_categoria = request.form.get("categoria", type=int)
+    data_texto = request.form.get("data", "")
+
 
     if not descricao:
         flash("Indique uma descrição.", "erro")
@@ -361,6 +530,20 @@ def nova_transacao(id_carteira):
     if id_categoria is None:
         flash("Escolha uma categoria.", "erro")
         return redirect(destino)
+        
+    try:
+        data_escolhida = datetime.strptime(data_texto, "%Y-%m-%d").date()
+    except ValueError:
+        flash("Data inválida.", "erro")
+        return redirect(destino)
+
+    # Transação futura: fica agendada e só mexe no saldo quando chegar o dia.
+    # A coluna Data é datetime: a futura fica às 00:00 desse dia, as outras com a hora atual.
+    futura = data_escolhida > date.today()
+    if futura:
+        data_transacao = datetime.combine(data_escolhida, time())
+    else:
+        data_transacao = datetime.combine(data_escolhida, datetime.now().time())
 
     ligacao = obter_ligacao()
     try:
@@ -374,30 +557,34 @@ def nova_transacao(id_carteira):
                 flash("Escolha uma categoria válida.", "erro")
                 return redirect(destino)
 
-            # Atualização relativa do valor: a conta é feita pela base de dados
-            if tipo == "receita":
-                cursor.execute(
-                    "UPDATE Carteiras SET Valor = Valor + %s WHERE ID_Carteira = %s",
-                    (valor, id_carteira),
-                )
-            else:
-                # Só subtrai se houver saldo suficiente
-                cursor.execute(
-                    "UPDATE Carteiras SET Valor = Valor - %s "
-                    "WHERE ID_Carteira = %s AND Valor >= %s",
-                    (valor, id_carteira, valor),
-                )
-                if cursor.rowcount == 0:
-                    ligacao.rollback()
-                    flash("Saldo insuficiente para esta despesa.", "erro")
-                    return redirect(destino)
+            # Atualização relativa do valor (a conta é feita pela base de dados).
+            # Uma transação futura não mexe já no saldo: é aplicada por
+            # aplicar_transacoes_agendadas quando chegar o dia.
+            if not futura:
+                if tipo == "receita":
+                    cursor.execute(
+                        "UPDATE Carteiras SET Valor = Valor + %s WHERE ID_Carteira = %s",
+                        (valor, id_carteira),
+                    )
+                else:
+                    # Só subtrai se houver saldo suficiente
+                    cursor.execute(
+                        "UPDATE Carteiras SET Valor = Valor - %s "
+                        "WHERE ID_Carteira = %s AND Valor >= %s",
+                        (valor, id_carteira, valor),
+                    )
+                    if cursor.rowcount == 0:
+                        ligacao.rollback()
+                        flash("Saldo insuficiente para esta despesa.", "erro")
+                        return redirect(destino)
 
-            # Registar a transação no histórico (a Data é preenchida automaticamente)
+            # Registar a transação no histórico, com a data escolhida (agendada se for futura)
             cursor.execute(
-                "INSERT INTO Transacoes (Transacao, Tipo, Valor, ID_Carteira, ID_Categoria) "
-                "VALUES (%s, %s, %s, %s, %s)",
-                (descricao, tipo, valor, id_carteira, id_categoria),
+                "INSERT INTO Transacoes (Transacao, Tipo, Valor, ID_Carteira, ID_Categoria, Data, Aplicada) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (descricao, tipo, valor, id_carteira, id_categoria, data_transacao, not futura),
             )
+
         ligacao.commit()
     except Exception:
         # Qualquer falha desfaz o UPDATE e o INSERT
@@ -406,7 +593,139 @@ def nova_transacao(id_carteira):
     finally:
         ligacao.close()
 
-    flash("Transação adicionada.", "sucesso")
+    if futura:
+        flash("Transação agendada. O saldo só muda na data escolhida.", "sucesso")
+    else:
+        flash("Transação adicionada.", "sucesso")
+    return redirect(destino)
+
+@app.route("/transacao/<int:id_transacao>/eliminar", methods=["POST"])
+def eliminar_transacao(id_transacao):
+    """Eliminação de uma transação, devolvendo à carteira o efeito que teve no saldo."""
+    if "id_utilizador" not in session:
+        return redirect(url_for("login"))
+
+    destino = url_for("area_pessoal")
+    ligacao = obter_ligacao()
+    try:
+        with ligacao.cursor() as cursor:
+            # Controlo de acesso: só transações das carteiras do próprio utilizador
+            transacao = obter_transacao_do_utilizador(cursor, id_transacao, session["id_utilizador"])
+            if transacao is None:
+                abort(404)
+            destino = url_for("area_pessoal", carteira=transacao["ID_Carteira"])
+
+            if transacao_bloqueada(transacao):
+                flash("Esta transação faz parte de um grupo ou é o saldo inicial e não pode ser eliminada.", "erro")
+                return redirect(destino)
+
+            # Desfazer o efeito no saldo (só se já tinha sido aplicada; as agendadas ainda não mexeram)
+            if transacao["Aplicada"]:
+                variacao = -efeito_no_saldo(transacao["Tipo"], transacao["Valor"])
+                cursor.execute(
+                    "UPDATE Carteiras SET Valor = Valor + %s "
+                    "WHERE ID_Carteira = %s AND Valor + %s >= 0",
+                    (variacao, transacao["ID_Carteira"], variacao),
+                )
+                if cursor.rowcount == 0:
+                    ligacao.rollback()
+                    flash("Saldo insuficiente para eliminar esta receita.", "erro")
+                    return redirect(destino)
+
+            cursor.execute("DELETE FROM Transacoes WHERE ID_Transacao = %s", (id_transacao,))
+        ligacao.commit()
+    except Exception:
+        ligacao.rollback()
+        raise
+    finally:
+        ligacao.close()
+
+    flash("Transação eliminada.", "sucesso")
+    return redirect(destino)
+
+@app.route("/transacao/<int:id_transacao>/editar", methods=["POST"])
+def editar_transacao(id_transacao):
+    """Edição de uma transação, acertando o saldo da carteira com a diferença.
+
+    O tipo (receita/despesa) e a carteira não mudam.
+    """
+    if "id_utilizador" not in session:
+        return redirect(url_for("login"))
+
+    id_utilizador = session["id_utilizador"]
+    descricao = request.form["transacao"].strip()
+    valor = converter_valor(request.form["valor"])
+    id_categoria = request.form.get("categoria", type=int)
+    data_texto = request.form.get("data", "")
+
+    destino = url_for("area_pessoal")
+    ligacao = obter_ligacao()
+    try:
+        with ligacao.cursor() as cursor:
+            transacao = obter_transacao_do_utilizador(cursor, id_transacao, id_utilizador)
+            if transacao is None:
+                abort(404)
+            destino = url_for("area_pessoal", carteira=transacao["ID_Carteira"])
+
+            if transacao_bloqueada(transacao):
+                flash("Esta transação faz parte de um grupo ou é o saldo inicial e não pode ser editada.", "erro")
+                return redirect(destino)
+
+            # Validação dos dados do formulário (as mesmas regras da criação)
+            if not descricao:
+                flash("Indique uma descrição.", "erro")
+                return redirect(destino)
+            if valor is None or valor <= 0:
+                flash("O valor tem de ser superior a 0.", "erro")
+                return redirect(destino)
+            if id_categoria is None or obter_categoria_do_utilizador(cursor, id_categoria, id_utilizador) is None:
+                flash("Escolha uma categoria válida.", "erro")
+                return redirect(destino)
+            try:
+                data_escolhida = datetime.strptime(data_texto, "%Y-%m-%d").date()
+            except ValueError:
+                flash("Data inválida.", "erro")
+                return redirect(destino)
+
+            # Data: se o dia não mudou, mantém-se a hora original
+            futura = data_escolhida > date.today()
+            if data_escolhida == transacao["Data"].date():
+                data_transacao = transacao["Data"]
+            elif futura:
+                data_transacao = datetime.combine(data_escolhida, time())
+            else:
+                data_transacao = datetime.combine(data_escolhida, datetime.now().time())
+
+            # Diferença no saldo: tira-se o efeito antigo (se já tinha sido aplicado)
+            # e põe-se o novo (se a nova data não for futura)
+            efeito_antigo = efeito_no_saldo(transacao["Tipo"], transacao["Valor"]) if transacao["Aplicada"] else 0
+            efeito_novo = 0 if futura else efeito_no_saldo(transacao["Tipo"], valor)
+            variacao = efeito_novo - efeito_antigo
+
+            if variacao != 0:
+                cursor.execute(
+                    "UPDATE Carteiras SET Valor = Valor + %s "
+                    "WHERE ID_Carteira = %s AND Valor + %s >= 0",
+                    (variacao, transacao["ID_Carteira"], variacao),
+                )
+                if cursor.rowcount == 0:
+                    ligacao.rollback()
+                    flash("Saldo insuficiente para esta alteração.", "erro")
+                    return redirect(destino)
+
+            cursor.execute(
+                "UPDATE Transacoes SET Transacao = %s, Valor = %s, ID_Categoria = %s, "
+                "Data = %s, Aplicada = %s WHERE ID_Transacao = %s",
+                (descricao, valor, id_categoria, data_transacao, not futura, id_transacao),
+            )
+        ligacao.commit()
+    except Exception:
+        ligacao.rollback()
+        raise
+    finally:
+        ligacao.close()
+
+    flash("Transação atualizada.", "sucesso")
     return redirect(destino)
 
 
@@ -458,6 +777,591 @@ def criar_categoria():
     flash("Categoria criada.", "sucesso")
     return redirect(destino)
 
+@app.route("/grupos")
+def grupos():
+    """Página de grupos do utilizador autenticado.
+
+    Mostra os grupos de que o utilizador é membro, os convites pendentes e,
+    do grupo selecionado (?grupo=ID, ou o primeiro por omissão), os membros
+    e as transações de grupo com a parte de cada membro.
+    """
+    if "id_utilizador" not in session:
+        return redirect(url_for("login"))
+
+    id_utilizador = session["id_utilizador"]
+    id_grupo = request.args.get("grupo", type=int)
+    inicio, fim, filtros = obter_filtro_meses(request.args.get("mes", ""), com_futuro=False)
+
+    grupo = None
+    membros = []
+    transacoes_grupo = []
+
+    ligacao = obter_ligacao()
+    try:
+        with ligacao.cursor() as cursor:
+            # Aplicar ao saldo as transações agendadas cuja data já chegou
+            aplicar_transacoes_agendadas(cursor, id_utilizador)
+            ligacao.commit()
+
+            # Grupos de que o utilizador é membro, com a sua função em cada um
+            cursor.execute(
+                "SELECT g.ID_Grupo, g.Grupo, f.Funcao FROM Grupos g "
+                "JOIN Membro_Grupo m ON m.ID_Grupo = g.ID_Grupo "
+                "JOIN Funcoes f ON f.ID_Funcao = m.ID_Funcao "
+                "WHERE m.ID_Utilizador = %s ORDER BY g.Grupo",
+                (id_utilizador,),
+            )
+            lista_grupos = cursor.fetchall()
+
+            # Convites pendentes dirigidos ao utilizador
+            cursor.execute(
+                "SELECT c.ID_Convite, g.Grupo, u.Nome, u.Apelido FROM Convites c "
+                "JOIN Grupos g ON g.ID_Grupo = c.ID_Grupo "
+                "JOIN Utilizadores u ON u.ID_Utilizador = c.ID_Convidou "
+                "WHERE c.ID_Utilizador = %s ORDER BY c.Data DESC",
+                (id_utilizador,),
+            )
+            convites = cursor.fetchall()
+
+            # Carteiras e categorias do utilizador, para o formulário de nova transação de grupo
+            cursor.execute(
+                "SELECT ID_Carteira, Carteira, Valor FROM Carteiras "
+                "WHERE ID_Utilizador = %s ORDER BY Carteira",
+                (id_utilizador,),
+            )
+            carteiras = cursor.fetchall()
+            categorias = obter_categorias_do_utilizador(cursor, id_utilizador)
+
+            # Sem grupo indicado no URL, abrir o primeiro
+            if id_grupo is None and lista_grupos:
+                id_grupo = lista_grupos[0]["ID_Grupo"]
+
+            if id_grupo is not None:
+                # Controlo de acesso: só os membros podem ver o grupo
+                grupo = obter_grupo_do_utilizador(cursor, id_grupo, id_utilizador)
+                if grupo is None:
+                    abort(404)
+
+                # Membros do grupo, com o administrador primeiro
+                cursor.execute(
+                    "SELECT u.ID_Utilizador, u.Nome, u.Apelido, f.Funcao FROM Membro_Grupo m "
+                    "JOIN Utilizadores u ON u.ID_Utilizador = m.ID_Utilizador "
+                    "JOIN Funcoes f ON f.ID_Funcao = m.ID_Funcao "
+                    "WHERE m.ID_Grupo = %s "
+                    "ORDER BY f.Funcao = %s DESC, u.Nome, u.Apelido",
+                    (id_grupo, FUNCAO_ADMINISTRADOR),
+                )
+                membros = cursor.fetchall()
+
+                # Transações do grupo no período escolhido, da mais recente para a mais antiga
+                sql = (
+                    "SELECT t.ID_Transacao_Grupo, t.Transacao, t.Valor, t.Data, "
+                    "c.Categoria, u.Nome, u.Apelido FROM Transacoes_Grupo t "
+                    "JOIN Categorias c ON c.ID_Categoria = t.ID_Categoria "
+                    "JOIN Utilizadores u ON u.ID_Utilizador = t.ID_Utilizador "
+                    "WHERE t.ID_Grupo = %s AND t.Data >= %s "
+                )
+                parametros = [id_grupo, inicio]
+                if fim is not None:
+                    sql += "AND t.Data < %s "
+                    parametros.append(fim)
+                sql += "ORDER BY t.Data DESC, t.ID_Transacao_Grupo DESC"
+                cursor.execute(sql, parametros)
+                transacoes_grupo = cursor.fetchall()
+
+
+                # Partes de todas as transações do grupo (uma só consulta)
+                cursor.execute(
+                    "SELECT p.ID_Transacao_Grupo, p.ID_Utilizador, p.Valor, p.Pago, "
+                    "u.Nome, u.Apelido FROM Membros_Transacoes_Grupo p "
+                    "JOIN Transacoes_Grupo t ON t.ID_Transacao_Grupo = p.ID_Transacao_Grupo "
+                    "JOIN Utilizadores u ON u.ID_Utilizador = p.ID_Utilizador "
+                    "WHERE t.ID_Grupo = %s ORDER BY u.Nome, u.Apelido",
+                    (id_grupo,),
+                )
+                # Juntar a cada transação a lista das suas partes
+                partes_por_transacao = {}
+                for parte in cursor.fetchall():
+                    partes_por_transacao.setdefault(parte["ID_Transacao_Grupo"], []).append(parte)
+                for transacao in transacoes_grupo:
+                    transacao["partes"] = partes_por_transacao.get(transacao["ID_Transacao_Grupo"], [])
+    finally:
+        ligacao.close()
+
+    return render_template(
+        "grupos.html",
+        nome=session["nome"],
+        id_utilizador=id_utilizador,
+        grupos=lista_grupos,
+        grupo=grupo,
+        membros=membros,
+        convites=convites,
+        carteiras=carteiras,
+        categorias=categorias,
+        transacoes_grupo=transacoes_grupo,
+        filtros=filtros,
+        hoje=date.today().isoformat(),
+        e_administrador=grupo is not None and grupo["Funcao"] == FUNCAO_ADMINISTRADOR,
+    )
+
+@app.route("/grupo/criar", methods=["POST"])
+def criar_grupo():
+    """Criação de um grupo. Quem o cria fica como administrador."""
+    if "id_utilizador" not in session:
+        return redirect(url_for("login"))
+
+    nome_grupo = request.form["grupo"].strip()
+    if not nome_grupo:
+        flash("Indique o nome do grupo.", "erro")
+        return redirect(url_for("grupos"))
+
+    ligacao = obter_ligacao()
+    try:
+        with ligacao.cursor() as cursor:
+            cursor.execute("INSERT INTO Grupos (Grupo) VALUES (%s)", (nome_grupo,))
+            id_grupo = cursor.lastrowid
+
+            # O criador entra no grupo como administrador (dono vem da sessão)
+            cursor.execute(
+                "INSERT INTO Membro_Grupo (ID_Grupo, ID_Utilizador, ID_Funcao) "
+                "SELECT %s, %s, ID_Funcao FROM Funcoes WHERE Funcao = %s",
+                (id_grupo, session["id_utilizador"], FUNCAO_ADMINISTRADOR),
+            )
+            if cursor.rowcount == 0:
+                raise RuntimeError("A função 'Administrador' não existe na tabela Funcoes.")
+        # O grupo e o administrador só ficam gravados juntos
+        ligacao.commit()
+    except Exception:
+        ligacao.rollback()
+        raise
+    finally:
+        ligacao.close()
+
+    flash("Grupo criado.", "sucesso")
+    return redirect(url_for("grupos", grupo=id_grupo))
+
+@app.route("/grupo/<int:id_grupo>/convidar", methods=["POST"])
+def convidar_membro(id_grupo):
+    """Convite de um utilizador (pelo email) para o grupo. Só o administrador pode convidar."""
+    if "id_utilizador" not in session:
+        return redirect(url_for("login"))
+
+    destino = url_for("grupos", grupo=id_grupo)
+    email = request.form["email"].strip().lower()
+    # Mensagem igual quer a conta exista quer não, para não revelar emails registados
+    mensagem_enviado = "Se existir uma conta com esse email, o convite foi enviado."
+
+    if not email:
+        flash("Indique o email da pessoa a convidar.", "erro")
+        return redirect(destino)
+
+    ligacao = obter_ligacao()
+    try:
+        with ligacao.cursor() as cursor:
+            # Controlo de acesso: tem de ser membro e administrador do grupo
+            grupo = obter_grupo_do_utilizador(cursor, id_grupo, session["id_utilizador"])
+            if grupo is None:
+                abort(404)
+            if grupo["Funcao"] != FUNCAO_ADMINISTRADOR:
+                abort(403)
+
+            cursor.execute(
+                "SELECT ID_Utilizador, Nome FROM Utilizadores WHERE Email = %s", (email,)
+            )
+
+            convidado = cursor.fetchone()
+            if convidado is None:
+                flash(mensagem_enviado)
+                return redirect(destino)
+
+            # Já é membro? (inclui o próprio administrador)
+            cursor.execute(
+                "SELECT 1 FROM Membro_Grupo WHERE ID_Grupo = %s AND ID_Utilizador = %s",
+                (id_grupo, convidado["ID_Utilizador"]),
+            )
+            if cursor.fetchone():
+                flash("Essa pessoa já é membro do grupo.", "erro")
+                return redirect(destino)
+
+            cursor.execute(
+                "INSERT INTO Convites (ID_Grupo, ID_Utilizador, ID_Convidou) VALUES (%s, %s, %s)",
+                (id_grupo, convidado["ID_Utilizador"], session["id_utilizador"]),
+            )
+        ligacao.commit()
+    except pymysql.err.IntegrityError:
+        # Violação de unique (ID_Grupo, ID_Utilizador): já há um convite pendente
+        ligacao.rollback()
+        flash(mensagem_enviado)
+        return redirect(destino)
+    finally:
+        ligacao.close()
+
+        # Avisar o convidado por email (uma falha no envio não anula o convite)
+    url_base = os.environ.get("URL_BASE", request.host_url).rstrip("/")
+    ligacao_grupos = url_base + url_for("grupos")
+    try:
+        enviar_email(
+            email,
+            f"Convite para o grupo \"{grupo['Grupo']}\"",
+            f"Olá {convidado['Nome']},\n\n"
+            f"{session['nome']} convidou-o(a) para o grupo \"{grupo['Grupo']}\" "
+            "no Finances4You.\n\n"
+            "Para aceitar ou recusar o convite, inicie sessão e abra a página de grupos:\n\n"
+            f"{ligacao_grupos}\n\n"
+            "Se não conhece quem o convidou, pode simplesmente recusar o convite.\n",
+        )
+    except (OSError, KeyError):
+        app.logger.exception("Falha ao enviar o email de convite.")
+
+
+    flash(mensagem_enviado)
+    return redirect(destino)
+
+@app.route("/convite/<int:id_convite>/aceitar", methods=["POST"])
+def aceitar_convite(id_convite):
+    """Aceitação de um convite: o utilizador passa a membro do grupo."""
+    if "id_utilizador" not in session:
+        return redirect(url_for("login"))
+
+    id_utilizador = session["id_utilizador"]
+    ligacao = obter_ligacao()
+    try:
+        with ligacao.cursor() as cursor:
+            # Controlo de acesso: o convite tem de ser dirigido a este utilizador
+            cursor.execute(
+                "SELECT ID_Grupo FROM Convites WHERE ID_Convite = %s AND ID_Utilizador = %s",
+                (id_convite, id_utilizador),
+            )
+            convite = cursor.fetchone()
+            if convite is None:
+                abort(404)
+
+            cursor.execute(
+                "INSERT INTO Membro_Grupo (ID_Grupo, ID_Utilizador, ID_Funcao) "
+                "SELECT %s, %s, ID_Funcao FROM Funcoes WHERE Funcao = %s",
+                (convite["ID_Grupo"], id_utilizador, FUNCAO_MEMBRO),
+            )
+            if cursor.rowcount == 0:
+                raise RuntimeError("A função 'Membro' não existe na tabela Funcoes.")
+
+            cursor.execute("DELETE FROM Convites WHERE ID_Convite = %s", (id_convite,))
+        # Entrar no grupo e apagar o convite acontecem juntos
+        ligacao.commit()
+    except Exception:
+        ligacao.rollback()
+        raise
+    finally:
+        ligacao.close()
+
+    flash("Entrou no grupo.", "sucesso")
+    return redirect(url_for("grupos", grupo=convite["ID_Grupo"]))
+
+@app.route("/convite/<int:id_convite>/recusar", methods=["POST"])
+def recusar_convite(id_convite):
+    """Recusa de um convite: o convite é apagado."""
+    if "id_utilizador" not in session:
+        return redirect(url_for("login"))
+
+    ligacao = obter_ligacao()
+    try:
+        with ligacao.cursor() as cursor:
+            # O WHERE só apaga o convite se for dirigido a este utilizador
+            cursor.execute(
+                "DELETE FROM Convites WHERE ID_Convite = %s AND ID_Utilizador = %s",
+                (id_convite, session["id_utilizador"]),
+            )
+            if cursor.rowcount == 0:
+                abort(404)
+        ligacao.commit()
+    finally:
+        ligacao.close()
+
+    flash("Convite recusado.")
+    return redirect(url_for("grupos"))
+
+@app.route("/grupo/<int:id_grupo>/membros/<int:id_membro>/remover", methods=["POST"])
+def remover_membro(id_grupo, id_membro):
+    """Remoção de um membro do grupo. Só o administrador pode remover.
+
+    Não deixa remover quem ainda tem contas por acertar no grupo.
+    """
+    if "id_utilizador" not in session:
+        return redirect(url_for("login"))
+
+    id_utilizador = session["id_utilizador"]
+    destino = url_for("grupos", grupo=id_grupo)
+
+    # O administrador não se pode remover a si próprio (o grupo ficaria sem administrador)
+    if id_membro == id_utilizador:
+        flash("Não pode remover-se a si próprio do grupo.", "erro")
+        return redirect(destino)
+
+    ligacao = obter_ligacao()
+    try:
+        with ligacao.cursor() as cursor:
+            # Controlo de acesso: tem de ser membro e administrador do grupo
+            grupo = obter_grupo_do_utilizador(cursor, id_grupo, id_utilizador)
+            if grupo is None:
+                abort(404)
+            if grupo["Funcao"] != FUNCAO_ADMINISTRADOR:
+                abort(403)
+
+            # Partes por pagar: que o membro deve, ou que lhe devem a ele
+            cursor.execute(
+                "SELECT 1 FROM Membros_Transacoes_Grupo p "
+                "JOIN Transacoes_Grupo t ON t.ID_Transacao_Grupo = p.ID_Transacao_Grupo "
+                "WHERE t.ID_Grupo = %s AND p.Pago = FALSE "
+                "AND (p.ID_Utilizador = %s OR t.ID_Utilizador = %s) LIMIT 1",
+                (id_grupo, id_membro, id_membro),
+            )
+            if cursor.fetchone():
+                flash("Este membro ainda tem partes por pagar ou por receber no grupo.", "erro")
+                return redirect(destino)
+
+            cursor.execute(
+                "DELETE FROM Membro_Grupo WHERE ID_Grupo = %s AND ID_Utilizador = %s",
+                (id_grupo, id_membro),
+            )
+            if cursor.rowcount == 0:
+                flash("Essa pessoa já não é membro do grupo.", "erro")
+                return redirect(destino)
+        ligacao.commit()
+    except Exception:
+        ligacao.rollback()
+        raise
+    finally:
+        ligacao.close()
+
+    flash("Membro removido do grupo.", "sucesso")
+    return redirect(destino)
+
+@app.route("/grupo/<int:id_grupo>/transacoes/nova", methods=["POST"])
+def nova_transacao_grupo(id_grupo):
+    """Registo de uma despesa de grupo, paga por quem a cria.
+
+    O valor total sai da carteira escolhida por quem cria (despesa pessoal) e é
+    dividido em partes iguais pelos membros selecionados. A parte de quem cria
+    fica logo paga. Tudo é gravado em conjunto: se algo falhar, nada fica gravado.
+    """
+    if "id_utilizador" not in session:
+        return redirect(url_for("login"))
+
+    id_utilizador = session["id_utilizador"]
+    destino = url_for("grupos", grupo=id_grupo)
+
+    # Extração e validação dos dados do formulário
+    descricao = request.form["transacao"].strip()
+    valor = converter_valor(request.form["valor"])
+    id_categoria = request.form.get("categoria", type=int)
+    id_carteira = request.form.get("carteira", type=int)
+    # Vários checkboxes com o mesmo name: getlist devolve todos os que foram marcados
+    ids_membros = list(dict.fromkeys(request.form.getlist("membros", type=int)))
+    data_texto = request.form.get("data", "")
+
+    if not descricao:
+        flash("Indique uma descrição.", "erro")
+        return redirect(destino)
+    if valor is None or valor <= 0:
+        flash("O valor tem de ser superior a 0.", "erro")
+        return redirect(destino)
+    if id_categoria is None or id_carteira is None:
+        flash("Escolha uma categoria e uma carteira.", "erro")
+        return redirect(destino)
+    if not ids_membros:
+        flash("Selecione pelo menos um membro.", "erro")
+        return redirect(destino)
+    if valor < Decimal("0.01") * len(ids_membros):
+        flash("O valor é demasiado pequeno para dividir por tantos membros.", "erro")
+        return redirect(destino)
+    try:
+        data_escolhida = datetime.strptime(data_texto, "%Y-%m-%d").date()
+    except ValueError:
+        flash("Data inválida.", "erro")
+        return redirect(destino)
+    if data_escolhida > date.today():
+        flash("A data não pode ser no futuro.", "erro")
+        return redirect(destino)
+
+    # A coluna Data é datetime: junta-se a hora atual ao dia escolhido
+    data_transacao = datetime.combine(data_escolhida, datetime.now().time())
+
+
+    # Quem paga fica em primeiro, para absorver os cêntimos que sobram da divisão
+    if id_utilizador in ids_membros:
+        ids_membros.remove(id_utilizador)
+        ids_membros.insert(0, id_utilizador)
+
+    ligacao = obter_ligacao()
+    try:
+        with ligacao.cursor() as cursor:
+            # Controlo de acesso: grupo, categoria e carteira
+            if obter_grupo_do_utilizador(cursor, id_grupo, id_utilizador) is None:
+                abort(404)
+            if obter_categoria_do_utilizador(cursor, id_categoria, id_utilizador) is None:
+                flash("Escolha uma categoria válida.", "erro")
+                return redirect(destino)
+            if obter_carteira_do_utilizador(cursor, id_carteira, id_utilizador) is None:
+                flash("Escolha uma carteira válida.", "erro")
+                return redirect(destino)
+
+            # Os membros selecionados têm de pertencer a este grupo
+            cursor.execute("SELECT ID_Utilizador FROM Membro_Grupo WHERE ID_Grupo = %s", (id_grupo,))
+            membros_do_grupo = {linha["ID_Utilizador"] for linha in cursor.fetchall()}
+            if not set(ids_membros) <= membros_do_grupo:
+                flash("Selecione apenas membros deste grupo.", "erro")
+                return redirect(destino)
+
+            # 1. Despesa pessoal: o valor total sai da carteira de quem paga
+            cursor.execute(
+                "UPDATE Carteiras SET Valor = Valor - %s "
+                "WHERE ID_Carteira = %s AND Valor >= %s",
+                (valor, id_carteira, valor),
+            )
+            if cursor.rowcount == 0:
+                ligacao.rollback()
+                flash("Saldo insuficiente na carteira escolhida.", "erro")
+                return redirect(destino)
+
+            cursor.execute(
+                "INSERT INTO Transacoes (Transacao, Tipo, Valor, ID_Carteira, ID_Categoria, Data) "
+                "VALUES (%s, 'despesa', %s, %s, %s, %s)",
+                (descricao, valor, id_carteira, id_categoria, data_transacao),
+            )
+
+            id_transacao_pessoal = cursor.lastrowid
+
+            # 2. Transação de grupo, ligada à despesa pessoal
+            cursor.execute(
+                "INSERT INTO Transacoes_Grupo "
+                "(Transacao, Valor, ID_Grupo, ID_Categoria, ID_Utilizador, ID_Transacao_Pessoal, Data) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (descricao, valor, id_grupo, id_categoria, id_utilizador, id_transacao_pessoal, data_transacao),
+            )
+
+            id_transacao_grupo = cursor.lastrowid
+
+            # 3. Uma parte por membro; a de quem pagou fica logo paga
+            partes = dividir_em_partes(valor, len(ids_membros))
+            for id_membro, parte in zip(ids_membros, partes):
+                pago = id_membro == id_utilizador
+                cursor.execute(
+                    "INSERT INTO Membros_Transacoes_Grupo "
+                    "(ID_Transacao_Grupo, ID_Utilizador, Valor, Pago, Data_Pagamento) "
+                    "VALUES (%s, %s, %s, %s, IF(%s, NOW(), NULL))",
+                    (id_transacao_grupo, id_membro, parte, pago, pago),
+                )
+        ligacao.commit()
+    except Exception:
+        # Qualquer falha desfaz o UPDATE da carteira e todos os INSERT
+        ligacao.rollback()
+        raise
+    finally:
+        ligacao.close()
+
+    flash("Transação de grupo criada.", "sucesso")
+    return redirect(destino)
+
+@app.route("/grupo/<int:id_grupo>/transacoes/<int:id_transacao_grupo>/pagar", methods=["POST"])
+def pagar_parte(id_grupo, id_transacao_grupo):
+    """Pagamento da parte do utilizador autenticado numa transação de grupo.
+
+    O valor da parte sai da carteira escolhida pelo membro (despesa) e entra na
+    carteira com que quem criou a transação pagou a conta (receita). Tudo é
+    gravado em conjunto: se algo falhar, nada fica gravado.
+    """
+    if "id_utilizador" not in session:
+        return redirect(url_for("login"))
+
+    id_utilizador = session["id_utilizador"]
+    destino = url_for("grupos", grupo=id_grupo)
+    id_carteira = request.form.get("carteira", type=int)
+
+    if id_carteira is None:
+        flash("Escolha a carteira com que vai pagar.", "erro")
+        return redirect(destino)
+
+    ligacao = obter_ligacao()
+    try:
+        with ligacao.cursor() as cursor:
+            # Controlo de acesso: a carteira de onde sai o dinheiro tem de ser do próprio utilizador
+            if obter_carteira_do_utilizador(cursor, id_carteira, id_utilizador) is None:
+                flash("Escolha uma carteira válida.", "erro")
+                return redirect(destino)
+
+            # A parte por pagar deste utilizador e a carteira de quem pagou a conta.
+            # FOR UPDATE bloqueia a linha até ao commit: a mesma parte não pode ser paga duas vezes.
+            cursor.execute(
+                "SELECT p.Valor, t.Transacao, t.ID_Categoria, tp.ID_Carteira AS ID_Carteira_Credor "
+                "FROM Membros_Transacoes_Grupo p "
+                "JOIN Transacoes_Grupo t ON t.ID_Transacao_Grupo = p.ID_Transacao_Grupo "
+                "LEFT JOIN Transacoes tp ON tp.ID_Transacao = t.ID_Transacao_Pessoal "
+                "WHERE p.ID_Transacao_Grupo = %s AND t.ID_Grupo = %s "
+                "AND p.ID_Utilizador = %s AND p.Pago = FALSE "
+                "FOR UPDATE",
+                (id_transacao_grupo, id_grupo, id_utilizador),
+            )
+            parte = cursor.fetchone()
+            if parte is None:
+                abort(404)
+            if parte["ID_Carteira_Credor"] is None:
+                flash("Não foi possível identificar a carteira de quem pagou esta despesa.", "erro")
+                return redirect(destino)
+
+            valor = parte["Valor"]
+
+            # 1. Despesa na carteira de quem paga a sua parte (só se houver saldo)
+            cursor.execute(
+                "UPDATE Carteiras SET Valor = Valor - %s "
+                "WHERE ID_Carteira = %s AND Valor >= %s",
+                (valor, id_carteira, valor),
+            )
+            if cursor.rowcount == 0:
+                ligacao.rollback()
+                flash("Saldo insuficiente na carteira escolhida.", "erro")
+                return redirect(destino)
+
+            cursor.execute(
+                "INSERT INTO Transacoes (Transacao, Tipo, Valor, ID_Carteira, ID_Categoria) "
+                "VALUES (%s, 'despesa', %s, %s, %s)",
+                (f"A minha parte: {parte['Transacao']}"[:100], valor, id_carteira, parte["ID_Categoria"]),
+            )
+            id_transacao_pagamento = cursor.lastrowid
+
+            # 2. Receita na carteira com que quem criou a transação pagou a conta
+            cursor.execute(
+                "UPDATE Carteiras SET Valor = Valor + %s WHERE ID_Carteira = %s",
+                (valor, parte["ID_Carteira_Credor"]),
+            )
+            cursor.execute(
+                "INSERT INTO Transacoes (Transacao, Tipo, Valor, ID_Carteira, ID_Categoria) "
+                "VALUES (%s, 'receita', %s, %s, %s)",
+                (
+                    f"Reembolso de {session['nome']}: {parte['Transacao']}"[:100],
+                    valor,
+                    parte["ID_Carteira_Credor"],
+                    parte["ID_Categoria"],
+                ),
+            )
+            id_transacao_recebimento = cursor.lastrowid
+
+            # 3. Marcar a parte como paga, ligada às duas transações pessoais
+            cursor.execute(
+                "UPDATE Membros_Transacoes_Grupo "
+                "SET Pago = TRUE, Data_Pagamento = NOW(), "
+                "ID_Transacao_Pagamento = %s, ID_Transacao_Recebimento = %s "
+                "WHERE ID_Transacao_Grupo = %s AND ID_Utilizador = %s",
+                (id_transacao_pagamento, id_transacao_recebimento, id_transacao_grupo, id_utilizador),
+            )
+        ligacao.commit()
+    except Exception:
+        # Qualquer falha desfaz os movimentos nas duas carteiras
+        ligacao.rollback()
+        raise
+    finally:
+        ligacao.close()
+
+    flash("A sua parte foi paga.", "sucesso")
+    return redirect(destino)
 
 @app.route("/logout")
 def logout():
