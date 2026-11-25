@@ -12,7 +12,7 @@ Para preparar o ambiente é necessário executar o seguinte código no terminal 
 
 ```.venv\Scripts\Activate.ps1```
 
-```pip install flask pymysql python-dotenv```
+```pip install flask pymysql python-dotenv lxml```
 
 
 Para realizar o arranque da aplicação é necessário executar no terminal (selecionada a pasta do projeto) o seguinte comando:  

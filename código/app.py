@@ -11,10 +11,11 @@ from decimal import ROUND_DOWN, Decimal, InvalidOperation
 from datetime import date, datetime, time, timedelta
 import pymysql
 from dotenv import load_dotenv
-from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
+from flask import Flask, Response, abort, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from email_utils import enviar_email
+from xml_utils import ErroValidacaoXML, gerar_xml_transacoes
 
 
 # Módulo local com a função de ligação à base de dados MariaDB
@@ -1495,6 +1496,14 @@ def relatorios():
 
     resultado_liquido = total_receitas - total_despesas
 
+    hoje = date.today()
+    if fim is not None:
+        data_inicio_padrao = inicio.isoformat()
+        data_fim_padrao = (fim - timedelta(days=1)).isoformat()
+    else:
+        data_inicio_padrao = hoje.replace(day=1).isoformat()
+        data_fim_padrao = hoje.isoformat()
+
     return render_template(
         "relatorios.html",
         nome=session["nome"],
@@ -1507,6 +1516,112 @@ def relatorios():
         despesas_categorias=despesas_categorias,
         filtros=filtros,
         mes_ativo=mes_ativo,
+        data_inicio_padrao=data_inicio_padrao,
+        data_fim_padrao=data_fim_padrao,
+    )
+
+
+@app.route("/relatorios/exportar", methods=["POST"])
+def exportar_transacoes_xml():
+    """Exporta em XML (validado pelo XSD) as transações pessoais do utilizador autenticado.
+
+    Recebe as datas de início e fim escolhidas pelo utilizador, recolhe apenas
+    os dados pertencentes à sessão atual, gera o XML validado contra o esquema
+    XSD e devolve-o para transferência.
+    """
+    if "id_utilizador" not in session:
+        return redirect(url_for("login"))
+
+    id_utilizador = session["id_utilizador"]
+    data_inicio_texto = request.form.get("data_inicio", "").strip()
+    data_fim_texto = request.form.get("data_fim", "").strip()
+
+    try:
+        data_inicio = datetime.strptime(data_inicio_texto, "%Y-%m-%d").date()
+        data_fim = datetime.strptime(data_fim_texto, "%Y-%m-%d").date()
+    except ValueError:
+        flash("Indique datas de início e fim válidas para a exportação.", "erro")
+        return redirect(url_for("relatorios"))
+
+    if data_fim < data_inicio:
+        flash("A data de fim tem de ser igual ou posterior à data de início.", "erro")
+        return redirect(url_for("relatorios"))
+
+    # Limite superior exclusivo: inclui todo o dia da data de fim (até às 23:59:59)
+    inicio_periodo = datetime.combine(data_inicio, time())
+    fim_periodo_exclusivo = datetime.combine(data_fim + timedelta(days=1), time())
+
+    ligacao = obter_ligacao()
+    try:
+        with ligacao.cursor() as cursor:
+            # Garantir que transações agendadas até hoje já estão atualizadas
+            aplicar_transacoes_agendadas(cursor, id_utilizador)
+            ligacao.commit()
+
+            # 1. Dados públicos do utilizador autenticado (sem Password)
+            cursor.execute(
+                "SELECT ID_Utilizador, Nome, Apelido, Email "
+                "FROM Utilizadores WHERE ID_Utilizador = %s",
+                (id_utilizador,),
+            )
+            utilizador = cursor.fetchone()
+            if utilizador is None:
+                session.clear()
+                return redirect(url_for("login"))
+
+            # 2. Carteiras pertencentes ao utilizador
+            cursor.execute(
+                "SELECT ID_Carteira, Carteira, Valor FROM Carteiras "
+                "WHERE ID_Utilizador = %s ORDER BY Carteira",
+                (id_utilizador,),
+            )
+            carteiras = cursor.fetchall()
+
+            # 3. Transações pessoais do utilizador no intervalo escolhido
+            cursor.execute(
+                "SELECT t.ID_Transacao, t.Transacao, t.Tipo, t.Valor, "
+                "t.Data, t.Aplicada, t.ID_Carteira, t.ID_Categoria "
+                "FROM Transacoes t "
+                "JOIN Carteiras w ON w.ID_Carteira = t.ID_Carteira "
+                "WHERE w.ID_Utilizador = %s AND t.Data >= %s AND t.Data < %s "
+                "ORDER BY t.Data ASC, t.ID_Transacao ASC",
+                (id_utilizador, inicio_periodo, fim_periodo_exclusivo),
+            )
+            transacoes = cursor.fetchall()
+
+            # 4. Categorias referenciadas pelas transações exportadas
+            cursor.execute(
+                "SELECT DISTINCT c.ID_Categoria, c.Categoria, c.ID_Utilizador "
+                "FROM Categorias c "
+                "JOIN Transacoes t ON t.ID_Categoria = c.ID_Categoria "
+                "JOIN Carteiras w ON w.ID_Carteira = t.ID_Carteira "
+                "WHERE w.ID_Utilizador = %s AND t.Data >= %s AND t.Data < %s "
+                "ORDER BY c.Categoria, c.ID_Categoria",
+                (id_utilizador, inicio_periodo, fim_periodo_exclusivo),
+            )
+            categorias = cursor.fetchall()
+    finally:
+        ligacao.close()
+
+    try:
+        conteudo_xml = gerar_xml_transacoes(
+            utilizador=utilizador,
+            carteiras=carteiras,
+            categorias=categorias,
+            transacoes=transacoes,
+            data_inicio=data_inicio,
+            data_fim=data_fim,
+        )
+    except ErroValidacaoXML:
+        app.logger.exception("O XML gerado para exportação falhou a validação XSD.")
+        flash("Não foi possível validar os dados exportados segundo o esquema XML.", "erro")
+        return redirect(url_for("relatorios"))
+
+    nome_ficheiro = f"transacoes_{data_inicio.isoformat()}_a_{data_fim.isoformat()}.xml"
+    return Response(
+        conteudo_xml,
+        mimetype="application/xml; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{nome_ficheiro}"'},
     )
 
 

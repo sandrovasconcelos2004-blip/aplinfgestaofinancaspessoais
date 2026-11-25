@@ -41,7 +41,36 @@
             <p class="aviso {{ categoria }}">{{ mensagem }}</p>
             {% endfor %}
 
-            <h1>{{ carteira.Carteira if carteira else "Todas as carteiras" }}</h1>
+            <div class="cabecalho-relatorio">
+                <h1>{{ carteira.Carteira if carteira else "Todas as carteiras" }}</h1>
+                <button type="button" id="abrir-exportar" class="botao-exportar">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+                    </svg>
+                    Exportar dados
+                </button>
+            </div>
+
+            <dialog id="janela-exportar" class="janela-transacao" aria-labelledby="titulo-exportar">
+                <div class="topo-janela">
+                    <h2 id="titulo-exportar">Exportar dados (XML)</h2>
+                    <button type="button" class="fechar" aria-label="Fechar">×</button>
+                </div>
+
+                <form id="form-exportar" class="formulario-simples" method="post" action="{{ url_for('exportar_transacoes_xml') }}">
+                    <p class="descricao-exportacao">
+                        Escolha o intervalo de datas das transações pessoais a incluir no ficheiro XML.
+                    </p>
+
+                    <label for="data_inicio">Data de início:</label>
+                    <input type="date" id="data_inicio" name="data_inicio" value="{{ data_inicio_padrao }}" required>
+
+                    <label for="data_fim">Data de fim:</label>
+                    <input type="date" id="data_fim" name="data_fim" value="{{ data_fim_padrao }}" required>
+
+                    <input type="submit" value="Exportar XML">
+                </form>
+            </dialog>
 
             <!-- Primeiro quadro: total de despesas, total de receitas e lucro/prejuízo -->
             <div class="quadro-resumo">
@@ -122,6 +151,40 @@
             </div>
         </section>
     </main>
+
+    <script>
+        const janelaExportar = document.getElementById("janela-exportar");
+        const formExportar = document.getElementById("form-exportar");
+        const campoInicio = document.getElementById("data_inicio");
+        const campoFim = document.getElementById("data_fim");
+
+        function validarDatasExportacao() {
+            if (campoInicio.value && campoFim.value && campoFim.value < campoInicio.value) {
+                campoFim.setCustomValidity("A data de fim tem de ser igual ou posterior à data de início.");
+            } else {
+                campoFim.setCustomValidity("");
+            }
+        }
+
+        document.getElementById("abrir-exportar").addEventListener("click", function () {
+            validarDatasExportacao();
+            janelaExportar.showModal();
+        });
+
+        janelaExportar.querySelector(".fechar").addEventListener("click", function () {
+            janelaExportar.close();
+        });
+
+        campoInicio.addEventListener("input", validarDatasExportacao);
+        campoFim.addEventListener("input", validarDatasExportacao);
+
+        formExportar.addEventListener("submit", function () {
+            validarDatasExportacao();
+            if (formExportar.checkValidity()) {
+                janelaExportar.close();
+            }
+        });
+    </script>
 </body>
 </html>
 

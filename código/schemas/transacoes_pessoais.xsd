@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Esquema XSD (XML Schema 1.0) para exportação de transações pessoais — Finances4You.
+
+    Baseado nas tabelas Utilizadores, Carteiras, Categorias e Transacoes
+    definidas em "Base de Dados.sql":
+    - Os dados exportados pertencem exclusivamente ao utilizador autenticado
+      (sem exposição de dados sensíveis como a palavra-passe).
+    - As transações estão filtradas pelo intervalo [DataInicio, DataFim]
+      escolhido pelo utilizador (a verificação DataFim >= DataInicio e a
+      filtragem das datas das transações são garantidas pela aplicação).
+    - A integridade referencial entre Transacoes, Carteiras e Categorias
+      é validada através de xs:key e xs:keyref.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://finances4you.pt/schemas/transacoes-pessoais"
+           xmlns:tns="http://finances4you.pt/schemas/transacoes-pessoais"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified"
+           version="1.0">
+
+    <!-- =================================================================== -->
+    <!-- Elemento raiz                                                       -->
+    <!-- =================================================================== -->
+    <xs:element name="ExportacaoTransacoes" type="tns:TipoExportacaoTransacoes">
+        <xs:annotation>
+            <xs:documentation>
+                Documento raiz que representa uma exportação das transações pessoais
+                do utilizador autenticado num intervalo de datas definido.
+            </xs:documentation>
+        </xs:annotation>
+
+        <!-- Chave primária das carteiras (Carteiras.ID_Carteira) -->
+        <xs:key name="pkCarteira">
+            <xs:selector xpath="tns:Carteiras/tns:Carteira"/>
+            <xs:field xpath="@id"/>
+        </xs:key>
+
+        <!-- Unicidade do nome da carteira por utilizador: unique (ID_Utilizador, Carteira) -->
+        <xs:unique name="ukCarteiraNome">
+            <xs:selector xpath="tns:Carteiras/tns:Carteira"/>
+            <xs:field xpath="tns:Nome"/>
+        </xs:unique>
+
+        <!-- Chave primária das categorias (Categorias.ID_Categoria) -->
+        <xs:key name="pkCategoria">
+            <xs:selector xpath="tns:Categorias/tns:Categoria"/>
+            <xs:field xpath="@id"/>
+        </xs:key>
+
+        <!-- Unicidade do nome da categoria no contexto do utilizador -->
+        <xs:unique name="ukCategoriaNome">
+            <xs:selector xpath="tns:Categorias/tns:Categoria"/>
+            <xs:field xpath="tns:Nome"/>
+        </xs:unique>
+
+        <!-- Chave primária das transações (Transacoes.ID_Transacao) -->
+        <xs:key name="pkTransacao">
+            <xs:selector xpath="tns:Transacoes/tns:Transacao"/>
+            <xs:field xpath="@id"/>
+        </xs:key>
+
+        <!-- Chave estrangeira: Transacoes.ID_Carteira -> Carteiras.ID_Carteira -->
+        <xs:keyref name="fkTransacaoCarteira" refer="tns:pkCarteira">
+            <xs:selector xpath="tns:Transacoes/tns:Transacao"/>
+            <xs:field xpath="@idCarteira"/>
+        </xs:keyref>
+
+        <!-- Chave estrangeira: Transacoes.ID_Categoria -> Categorias.ID_Categoria -->
+        <xs:keyref name="fkTransacaoCategoria" refer="tns:pkCategoria">
+            <xs:selector xpath="tns:Transacoes/tns:Transacao"/>
+            <xs:field xpath="@idCategoria"/>
+        </xs:keyref>
+    </xs:element>
+
+    <!-- =================================================================== -->
+    <!-- Tipos complexos                                                     -->
+    <!-- =================================================================== -->
+    <xs:complexType name="TipoExportacaoTransacoes">
+        <xs:sequence>
+            <xs:element name="Periodo" type="tns:TipoPeriodo"/>
+            <xs:element name="Utilizador" type="tns:TipoUtilizador"/>
+            <xs:element name="Carteiras" type="tns:TipoListaCarteiras"/>
+            <xs:element name="Categorias" type="tns:TipoListaCategorias"/>
+            <xs:element name="Transacoes" type="tns:TipoListaTransacoes"/>
+            <xs:element name="Resumo" type="tns:TipoResumo" minOccurs="0"/>
+        </xs:sequence>
+        <xs:attribute name="dataExportacao" type="xs:dateTime" use="required">
+            <xs:annotation>
+                <xs:documentation>Data e hora em que o ficheiro XML foi gerado.</xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+        <xs:attribute name="moeda" type="tns:TipoMoeda" use="required">
+            <xs:annotation>
+                <xs:documentation>Moeda utilizada nos valores monetários (EUR).</xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+        <xs:attribute name="versao" type="xs:string" use="optional" default="1.0"/>
+    </xs:complexType>
+
+    <xs:complexType name="TipoPeriodo">
+        <xs:annotation>
+            <xs:documentation>
+                Intervalo de datas (inclusivo) selecionado pelo utilizador para a exportação.
+            </xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="DataInicio" type="xs:date"/>
+            <xs:element name="DataFim" type="xs:date"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="TipoUtilizador">
+        <xs:annotation>
+            <xs:documentation>
+                Dados públicos do utilizador autenticado (tabela Utilizadores, sem Password).
+            </xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="Nome" type="tns:TipoTexto100"/>
+            <xs:element name="Apelido" type="tns:TipoTexto100"/>
+            <xs:element name="Email" type="tns:TipoEmail"/>
+        </xs:sequence>
+        <xs:attribute name="id" type="tns:TipoID" use="required"/>
+    </xs:complexType>
+
+    <xs:complexType name="TipoListaCarteiras">
+        <xs:sequence>
+            <xs:element name="Carteira" type="tns:TipoCarteira" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="TipoCarteira">
+        <xs:annotation>
+            <xs:documentation>
+                Carteira pertencente ao utilizador autenticado (tabela Carteiras).
+            </xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="Nome" type="tns:TipoTexto100"/>
+            <xs:element name="Saldo" type="tns:TipoValorNaoNegativo"/>
+        </xs:sequence>
+        <xs:attribute name="id" type="tns:TipoID" use="required"/>
+    </xs:complexType>
+
+    <xs:complexType name="TipoListaCategorias">
+        <xs:sequence>
+            <xs:element name="Categoria" type="tns:TipoCategoria" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="TipoCategoria">
+        <xs:annotation>
+            <xs:documentation>
+                Categoria associada às transações exportadas (tabela Categorias).
+                O atributo personalizada indica se foi criada pelo utilizador
+                (ID_Utilizador IS NOT NULL) ou se é pré-definida (ID_Utilizador IS NULL).
+            </xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="Nome" type="tns:TipoTexto100"/>
+        </xs:sequence>
+        <xs:attribute name="id" type="tns:TipoID" use="required"/>
+        <xs:attribute name="personalizada" type="xs:boolean" use="required"/>
+    </xs:complexType>
+
+    <xs:complexType name="TipoListaTransacoes">
+        <xs:sequence>
+            <xs:element name="Transacao" type="tns:TipoTransacao" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="TipoTransacao">
+        <xs:annotation>
+            <xs:documentation>
+                Transação pessoal do utilizador autenticado dentro do período escolhido
+                (tabela Transacoes).
+            </xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="Descricao" type="tns:TipoTexto100"/>
+            <xs:element name="Tipo" type="tns:TipoMovimento"/>
+            <xs:element name="Valor" type="tns:TipoValorPositivo"/>
+            <xs:element name="Data" type="xs:dateTime"/>
+            <xs:element name="Aplicada" type="xs:boolean"/>
+        </xs:sequence>
+        <xs:attribute name="id" type="tns:TipoID" use="required"/>
+        <xs:attribute name="idCarteira" type="tns:TipoID" use="required"/>
+        <xs:attribute name="idCategoria" type="tns:TipoID" use="required"/>
+    </xs:complexType>
+
+    <xs:complexType name="TipoResumo">
+        <xs:annotation>
+            <xs:documentation>
+                Totais agregados das transações incluídas no período exportado.
+            </xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="TotalTransacoes" type="xs:nonNegativeInteger"/>
+            <xs:element name="TotalReceitas" type="tns:TipoValorNaoNegativo"/>
+            <xs:element name="TotalDespesas" type="tns:TipoValorNaoNegativo"/>
+            <xs:element name="ResultadoLiquido" type="tns:TipoValorMonetario"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- =================================================================== -->
+    <!-- Tipos simples (alinhados com as restrições da base de dados)        -->
+    <!-- =================================================================== -->
+    <xs:simpleType name="TipoID">
+        <xs:annotation>
+            <xs:documentation>Identificador inteiro positivo (INT AUTO_INCREMENT).</xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:positiveInteger">
+            <xs:maxInclusive value="2147483647"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoTexto100">
+        <xs:annotation>
+            <xs:documentation>Texto obrigatório até 100 caracteres (VARCHAR(100) NOT NULL).</xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:token">
+            <xs:minLength value="1"/>
+            <xs:maxLength value="100"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoEmail">
+        <xs:annotation>
+            <xs:documentation>Endereço de email válido até 150 caracteres (VARCHAR(150) NOT NULL).</xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:token">
+            <xs:minLength value="3"/>
+            <xs:maxLength value="150"/>
+            <xs:pattern value="[^@\s]+@[^@\s]+\.[^@\s]+"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoMovimento">
+        <xs:annotation>
+            <xs:documentation>Tipo de transação (ENUM('receita', 'despesa') NOT NULL).</xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="receita"/>
+            <xs:enumeration value="despesa"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoValorMonetario">
+        <xs:annotation>
+            <xs:documentation>Valor monetário com até 12 dígitos no total e 2 casas decimais (DECIMAL(12,2)).</xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:decimal">
+            <xs:totalDigits value="12"/>
+            <xs:fractionDigits value="2"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoValorNaoNegativo">
+        <xs:annotation>
+            <xs:documentation>Valor monetário igual ou superior a 0.00 (ex.: saldo de carteira).</xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="tns:TipoValorMonetario">
+            <xs:minInclusive value="0.00"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoValorPositivo">
+        <xs:annotation>
+            <xs:documentation>Valor monetário estritamente superior a 0.00 (valor de uma transação).</xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="tns:TipoValorMonetario">
+            <xs:minExclusive value="0.00"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoMoeda">
+        <xs:annotation>
+            <xs:documentation>Código ISO 4217 da moeda utilizada na aplicação (Euro).</xs:documentation>
+        </xs:annotation>
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="EUR"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+</xs:schema>
