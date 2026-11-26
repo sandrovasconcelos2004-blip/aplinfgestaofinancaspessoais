@@ -14,10 +14,7 @@ Password varchar (255) not null
 -- Criação Tabela Categorias
 create table Categorias (
 ID_Categoria int not null auto_increment primary key,
-Categoria varchar (100) not null,
-ID_Utilizador int null,
-foreign key (ID_Utilizador) references Utilizadores(ID_Utilizador),
-unique (ID_Utilizador, Categoria)
+Categoria varchar (100) not null unique
 );
 
 
@@ -116,15 +113,15 @@ primary key (ID_Transacao_Grupo, ID_Utilizador)
 );
 
 -- Categorias pré-definidas (comuns a todos os utilizadores)
-insert into Categorias (Categoria, ID_Utilizador) values
-('Saldo Inicial', null),
-('Alimentação', null),
-('Casa', null),
-('Lazer', null),
-('Salário', null),
-('Saúde', null),
-('Transportes', null),
-('Outros', null);
+insert into Categorias (Categoria) values
+('Saldo Inicial'),
+('Alimentação'),
+('Casa'),
+('Lazer'),
+('Salário'),
+('Saúde'),
+('Transportes'),
+('Outros');
 
 -- Funções dos membros de um grupo
 insert into Funcoes (Funcao) values ('Administrador'), ('Membro');

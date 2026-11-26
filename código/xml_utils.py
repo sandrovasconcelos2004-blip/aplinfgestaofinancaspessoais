@@ -11,11 +11,14 @@ from lxml import etree
 
 
 NAMESPACE_TRANSACOES = "http://finances4you.pt/schemas/transacoes-pessoais"
-CAMINHO_XSD = os.path.join(
+NAMESPACE_AVALIACAO = "http://finances4you.pt/schemas/avaliacao-financeira"
+DIRETORIO_SCHEMAS = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "schemas",
-    "transacoes_pessoais.xsd",
 )
+CAMINHO_XSD = os.path.join(DIRETORIO_SCHEMAS, "transacoes_pessoais.xsd")
+CAMINHO_XSD_AVALIACAO = os.path.join(DIRETORIO_SCHEMAS, "avaliacao_financeira.xsd")
+CAMINHO_XSL_AVALIACAO = os.path.join(DIRETORIO_SCHEMAS, "avaliacao_financeira.xsl")
 
 
 class ErroValidacaoXML(Exception):
@@ -89,13 +92,11 @@ def gerar_xml_transacoes(utilizador, carteiras, categorias, transacoes, data_ini
     # Categorias usadas nas transações exportadas
     categorias_el = etree.SubElement(raiz, f"{ns}Categorias")
     for categoria in categorias:
-        personalizada = "true" if categoria["ID_Utilizador"] is not None else "false"
         categoria_el = etree.SubElement(
             categorias_el,
             f"{ns}Categoria",
             attrib={
-                "id": str(categoria["ID_Categoria"]),
-                "personalizada": personalizada,
+                "id": str(categoria["ID_Categoria"])
             },
         )
         etree.SubElement(categoria_el, f"{ns}Nome").text = categoria["Categoria"].strip()
@@ -153,3 +154,38 @@ def gerar_xml_transacoes(utilizador, carteiras, categorias, transacoes, data_ini
         xml_declaration=True,
         encoding="UTF-8",
     )
+
+
+def carregar_esquema_avaliacao_xsd():
+    """Carrega e compila o esquema XSD do relatório de avaliação financeira."""
+    documento_xsd = etree.parse(CAMINHO_XSD_AVALIACAO)
+    return etree.XMLSchema(documento_xsd)
+
+
+def validar_xml_avaliacao(xml_bytes):
+    """Faz parse e valida o XML de avaliação financeira contra ``avaliacao_financeira.xsd``.
+
+    Devolve o elemento raiz ``lxml.etree._Element`` se for válido.
+    Levanta ``ErroValidacaoXML`` se o XML estiver mal formado ou violar o XSD.
+    """
+    try:
+        documento = etree.fromstring(xml_bytes)
+    except etree.XMLSyntaxError as erro:
+        raise ErroValidacaoXML(f"XML mal formado: {erro}") from erro
+
+    esquema = carregar_esquema_avaliacao_xsd()
+    try:
+        esquema.assertValid(documento)
+    except etree.DocumentInvalid as erro:
+        raise ErroValidacaoXML(str(erro)) from erro
+
+    return documento
+
+
+def transformar_avaliacao_html(xml_bytes):
+    """Valida o XML de avaliação financeira e transforma-o em HTML via XSLT."""
+    documento = validar_xml_avaliacao(xml_bytes)
+    folha_xsl = etree.parse(CAMINHO_XSL_AVALIACAO)
+    transformacao = etree.XSLT(folha_xsl)
+    resultado = transformacao(documento)
+    return str(resultado)

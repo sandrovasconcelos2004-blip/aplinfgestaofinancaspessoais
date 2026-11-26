@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Avaliação de Saúde Financeira</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        Bem-vindo(a), <strong>{{ nome }}</strong>
+        <nav>
+            <a href="{{ url_for('area_pessoal') }}" class="botao-verde">Carteiras</a>
+            <a href="{{ url_for('grupos') }}" class="botao-verde">Grupos</a>
+            <a href="{{ url_for('relatorios') }}" class="botao-verde">Relatórios</a>
+            <a href="{{ url_for('logout') }}">Logout</a>
+        </nav>
+    </header>
+
+    <main class="pagina-avaliacao">
+        <div class="barra-acoes-avaliacao">
+            <a href="{{ url_for('relatorios') }}" class="botao-voltar">← Voltar aos Relatórios</a>
+
+            <form method="post" action="{{ url_for('descarregar_avaliacao_xml') }}">
+                <input type="hidden" name="data_inicio" value="{{ data_inicio }}">
+                <input type="hidden" name="data_fim" value="{{ data_fim }}">
+                <button type="submit" class="botao-exportar">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+                    </svg>
+                    Descarregar XML
+                </button>
+            </form>
+        </div>
+
+        {{ conteudo_html }}
+    </main>
+</body>
+</html>

@@ -6,16 +6,25 @@ e gestão de carteiras e transações e grupos.
 """
 
 
+import json
 import os
 from decimal import ROUND_DOWN, Decimal, InvalidOperation
 from datetime import date, datetime, time, timedelta
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 import pymysql
 from dotenv import load_dotenv
-from flask import Flask, Response, abort, flash, redirect, render_template, request, session, url_for
+from flask import Flask, Response, abort, flash, jsonify, redirect, render_template, request, session, url_for
+from markupsafe import Markup
 from werkzeug.security import check_password_hash, generate_password_hash
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from email_utils import enviar_email
-from xml_utils import ErroValidacaoXML, gerar_xml_transacoes
+from xml_utils import (
+    ErroValidacaoXML,
+    gerar_xml_transacoes,
+    transformar_avaliacao_html,
+    validar_xml_avaliacao,
+)
 
 
 # Módulo local com a função de ligação à base de dados MariaDB
@@ -29,6 +38,13 @@ app = Flask(__name__)
 
 # Chave secreta usada para assinar cookies e proteger as sessões
 app.secret_key = os.environ["SECRET_KEY"]
+
+# Configuração de interoperabilidade com o serviço externo de score financeiro
+API_KEY_INTEROP = os.environ.get("API_KEY_INTEROP", "")
+SCORE_SERVICE_URL = os.environ.get(
+    "SCORE_SERVICE_URL",
+    "http://127.0.0.1:5001/api/v1/avaliar",
+)
 
 VALIDADE_TOKEN = 3600  # segundos
 serializador = URLSafeTimedSerializer(app.secret_key, salt="recuperar-password")
@@ -119,10 +135,10 @@ def obter_categorias_do_utilizador(cursor, id_utilizador):
     A categoria reservada ao valor inicial das carteiras não é incluída.
     """
     cursor.execute(
-        "SELECT ID_Categoria, Categoria, ID_Utilizador FROM Categorias "
-        "WHERE (ID_Utilizador IS NULL OR ID_Utilizador = %s) AND Categoria <> %s "
+        "SELECT ID_Categoria, Categoria FROM Categorias "
+        "WHERE Categoria <> %s "
         "ORDER BY Categoria",
-        (id_utilizador, CATEGORIA_SALDO_INICIAL),
+        (CATEGORIA_SALDO_INICIAL,),
     )
     return cursor.fetchall()
 
@@ -134,9 +150,9 @@ def obter_categoria_do_utilizador(cursor, id_categoria, id_utilizador):
     """
     cursor.execute(
         "SELECT * FROM Categorias "
-        "WHERE ID_Categoria = %s AND (ID_Utilizador IS NULL OR ID_Utilizador = %s) "
+        "WHERE ID_Categoria = %s "
         "AND Categoria <> %s",
-        (id_categoria, id_utilizador, CATEGORIA_SALDO_INICIAL),
+        (id_categoria, CATEGORIA_SALDO_INICIAL),
     )
     return cursor.fetchone()
 
@@ -488,7 +504,7 @@ def criar_carteira():
             if valor > 0:
                 cursor.execute(
                     "SELECT ID_Categoria FROM Categorias "
-                    "WHERE Categoria = %s AND ID_Utilizador IS NULL",
+                    "WHERE Categoria = %s",
                     (CATEGORIA_SALDO_INICIAL,),
                 )
 
@@ -743,54 +759,6 @@ def editar_transacao(id_transacao):
     flash("Transação atualizada.", "sucesso")
     return redirect(destino)
 
-
-@app.route("/categoria/criar", methods=["POST"])
-def criar_categoria():
-    """Criação de uma categoria personalizada para o utilizador autenticado.
-
-    Não permite repetir o nome de uma categoria pré-definida ou já criada pelo utilizador.
-    """
-    if "id_utilizador" not in session:
-        return redirect(url_for("login"))
-
-    nome_categoria = request.form["categoria"].strip()
-    # Carteira aberta no dashboard, usada apenas para lá voltar
-    id_carteira = request.form.get("carteira", type=int)
-    destino = url_for("area_pessoal", carteira=id_carteira)
-
-    if not nome_categoria:
-        flash("Indique o nome da categoria.", "erro")
-        return redirect(destino)
-
-    ligacao = obter_ligacao()
-    try:
-        with ligacao.cursor() as cursor:
-            # Verificar se já existe com esse nome (pré-definida ou do utilizador)
-            cursor.execute(
-                "SELECT ID_Categoria FROM Categorias "
-                "WHERE Categoria = %s AND (ID_Utilizador IS NULL OR ID_Utilizador = %s)",
-                (nome_categoria, session["id_utilizador"]),
-            )
-            if cursor.fetchone():
-                flash("Essa categoria já existe.", "erro")
-                return redirect(destino)
-
-            # O dono da categoria vem sempre da sessão, nunca do formulário
-            cursor.execute(
-                "INSERT INTO Categorias (Categoria, ID_Utilizador) VALUES (%s, %s)",
-                (nome_categoria, session["id_utilizador"]),
-            )
-        ligacao.commit()
-    except pymysql.err.IntegrityError:
-        # Violação de unique (ID_Utilizador, Categoria)
-        ligacao.rollback()
-        flash("Essa categoria já existe.", "erro")
-        return redirect(destino)
-    finally:
-        ligacao.close()
-
-    flash("Categoria criada.", "sucesso")
-    return redirect(destino)
 
 @app.route("/grupos")
 def grupos():
@@ -1591,7 +1559,7 @@ def exportar_transacoes_xml():
 
             # 4. Categorias referenciadas pelas transações exportadas
             cursor.execute(
-                "SELECT DISTINCT c.ID_Categoria, c.Categoria, c.ID_Utilizador "
+                "SELECT DISTINCT c.ID_Categoria, c.Categoria "
                 "FROM Categorias c "
                 "JOIN Transacoes t ON t.ID_Categoria = c.ID_Categoria "
                 "JOIN Carteiras w ON w.ID_Carteira = t.ID_Carteira "
@@ -1620,6 +1588,227 @@ def exportar_transacoes_xml():
     nome_ficheiro = f"transacoes_{data_inicio.isoformat()}_a_{data_fim.isoformat()}.xml"
     return Response(
         conteudo_xml,
+        mimetype="application/xml; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{nome_ficheiro}"'},
+    )
+
+
+@app.route("/api/v1/transacoes", methods=["GET"])
+def api_transacoes_json():
+    """Endpoint REST (JSON) para interoperabilidade com o serviço externo de score.
+
+    Exige autenticação via header ``X-API-Key`` (definida em ``API_KEY_INTEROP``)
+    e parâmetros de query ``id_utilizador``, ``data_inicio`` e ``data_fim`` (YYYY-MM-DD).
+    """
+    chave_recebida = request.headers.get("X-API-Key", "")
+    if not API_KEY_INTEROP or chave_recebida != API_KEY_INTEROP:
+        return jsonify({"erro": "Chave de API inválida ou em falta."}), 401
+
+    id_utilizador = request.args.get("id_utilizador", type=int)
+    data_inicio_texto = request.args.get("data_inicio", "").strip()
+    data_fim_texto = request.args.get("data_fim", "").strip()
+
+    if not id_utilizador or id_utilizador <= 0:
+        return jsonify({"erro": "Parâmetro 'id_utilizador' inválido ou em falta."}), 400
+
+    try:
+        data_inicio = datetime.strptime(data_inicio_texto, "%Y-%m-%d").date()
+        data_fim = datetime.strptime(data_fim_texto, "%Y-%m-%d").date()
+    except ValueError:
+        return jsonify({"erro": "Datas inválidas. Utilize o formato YYYY-MM-DD."}), 400
+
+    if data_fim < data_inicio:
+        return jsonify({"erro": "'data_fim' tem de ser igual ou posterior a 'data_inicio'."}), 400
+
+    inicio_periodo = datetime.combine(data_inicio, time())
+    fim_periodo_exclusivo = datetime.combine(data_fim + timedelta(days=1), time())
+
+    ligacao = obter_ligacao()
+    try:
+        with ligacao.cursor() as cursor:
+            aplicar_transacoes_agendadas(cursor, id_utilizador)
+            ligacao.commit()
+
+            cursor.execute(
+                "SELECT ID_Utilizador, Nome, Apelido, Email "
+                "FROM Utilizadores WHERE ID_Utilizador = %s",
+                (id_utilizador,),
+            )
+            utilizador = cursor.fetchone()
+            if utilizador is None:
+                return jsonify({"erro": "Utilizador não encontrado."}), 404
+
+            cursor.execute(
+                "SELECT ID_Carteira, Carteira, Valor FROM Carteiras "
+                "WHERE ID_Utilizador = %s ORDER BY Carteira",
+                (id_utilizador,),
+            )
+            carteiras = cursor.fetchall()
+
+            cursor.execute(
+                "SELECT t.ID_Transacao, t.Transacao, t.Tipo, t.Valor, "
+                "t.Data, t.Aplicada, w.Carteira, c.Categoria "
+                "FROM Transacoes t "
+                "JOIN Carteiras w ON w.ID_Carteira = t.ID_Carteira "
+                "JOIN Categorias c ON c.ID_Categoria = t.ID_Categoria "
+                "WHERE w.ID_Utilizador = %s AND t.Data >= %s AND t.Data < %s "
+                "ORDER BY t.Data ASC, t.ID_Transacao ASC",
+                (id_utilizador, inicio_periodo, fim_periodo_exclusivo),
+            )
+            transacoes = cursor.fetchall()
+    finally:
+        ligacao.close()
+
+    return jsonify(
+        {
+            "periodo": {
+                "data_inicio": data_inicio.isoformat(),
+                "data_fim": data_fim.isoformat(),
+            },
+            "utilizador": {
+                "id": utilizador["ID_Utilizador"],
+                "nome": utilizador["Nome"].strip(),
+                "apelido": utilizador["Apelido"].strip(),
+                "email": utilizador["Email"].strip(),
+            },
+            "carteiras": [
+                {
+                    "id": c["ID_Carteira"],
+                    "nome": c["Carteira"].strip(),
+                    "saldo": f"{Decimal(c['Valor']).quantize(Decimal('0.01')):.2f}",
+                }
+                for c in carteiras
+            ],
+            "transacoes": [
+                {
+                    "id": t["ID_Transacao"],
+                    "descricao": t["Transacao"].strip(),
+                    "tipo": t["Tipo"],
+                    "valor": f"{Decimal(t['Valor']).quantize(Decimal('0.01')):.2f}",
+                    "data": t["Data"].replace(microsecond=0).isoformat(),
+                    "aplicada": bool(t["Aplicada"]),
+                    "carteira": t["Carteira"].strip(),
+                    "categoria": t["Categoria"].strip(),
+                }
+                for t in transacoes
+            ],
+        }
+    ), 200
+
+
+def _pedir_xml_avaliacao_externa(id_utilizador, data_inicio, data_fim):
+    """Solicita ao serviço externo o XML de avaliação de saúde financeira."""
+    if not API_KEY_INTEROP:
+        raise RuntimeError("A chave API_KEY_INTEROP não está configurada no ambiente.")
+
+    corpo = json.dumps(
+        {
+            "id_utilizador": id_utilizador,
+            "data_inicio": data_inicio.isoformat(),
+            "data_fim": data_fim.isoformat(),
+        }
+    ).encode("utf-8")
+
+    pedido = urllib_request.Request(
+        SCORE_SERVICE_URL,
+        data=corpo,
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "X-API-Key": API_KEY_INTEROP,
+            "Accept": "application/xml",
+        },
+        method="POST",
+    )
+    with urllib_request.urlopen(pedido, timeout=10) as resposta:
+        return resposta.read()
+
+
+@app.route("/relatorios/avaliacao", methods=["POST"])
+def avaliar_saude_financeira():
+    """Solicita a avaliação ao serviço externo, valida o XML (XSD) e transforma em HTML (XSLT)."""
+    if "id_utilizador" not in session:
+        return redirect(url_for("login"))
+
+    id_utilizador = session["id_utilizador"]
+    data_inicio_texto = request.form.get("data_inicio", "").strip()
+    data_fim_texto = request.form.get("data_fim", "").strip()
+
+    try:
+        data_inicio = datetime.strptime(data_inicio_texto, "%Y-%m-%d").date()
+        data_fim = datetime.strptime(data_fim_texto, "%Y-%m-%d").date()
+    except ValueError:
+        flash("Indique datas de início e fim válidas para a avaliação.", "erro")
+        return redirect(url_for("relatorios"))
+
+    if data_fim < data_inicio:
+        flash("A data de fim tem de ser igual ou posterior à data de início.", "erro")
+        return redirect(url_for("relatorios"))
+
+    try:
+        xml_bytes = _pedir_xml_avaliacao_externa(id_utilizador, data_inicio, data_fim)
+    except (urllib_error.URLError, TimeoutError):
+        app.logger.exception("Falha na comunicação com o serviço externo de score.")
+        flash(
+            "Não foi possível contactar o serviço externo de avaliação financeira. "
+            "Verifique se o serviço está em execução.",
+            "erro",
+        )
+        return redirect(url_for("relatorios"))
+    except RuntimeError as erro:
+        flash(str(erro), "erro")
+        return redirect(url_for("relatorios"))
+
+    try:
+        html_avaliacao = transformar_avaliacao_html(xml_bytes)
+    except ErroValidacaoXML:
+        app.logger.exception("O XML recebido do serviço externo falhou a validação XSD.")
+        flash(
+            "O documento XML devolvido pelo serviço externo não cumpre o esquema XSD acordado.",
+            "erro",
+        )
+        return redirect(url_for("relatorios"))
+
+    return render_template(
+        "avaliacao.html",
+        nome=session["nome"],
+        conteudo_html=Markup(html_avaliacao),
+        data_inicio=data_inicio.isoformat(),
+        data_fim=data_fim.isoformat(),
+    )
+
+
+@app.route("/relatorios/avaliacao/xml", methods=["POST"])
+def descarregar_avaliacao_xml():
+    """Devolve para transferência o documento XML bruto validado pelo XSD."""
+    if "id_utilizador" not in session:
+        return redirect(url_for("login"))
+
+    id_utilizador = session["id_utilizador"]
+    data_inicio_texto = request.form.get("data_inicio", "").strip()
+    data_fim_texto = request.form.get("data_fim", "").strip()
+
+    try:
+        data_inicio = datetime.strptime(data_inicio_texto, "%Y-%m-%d").date()
+        data_fim = datetime.strptime(data_fim_texto, "%Y-%m-%d").date()
+    except ValueError:
+        flash("Datas inválidas para transferir o XML de avaliação.", "erro")
+        return redirect(url_for("relatorios"))
+
+    if data_fim < data_inicio:
+        flash("A data de fim tem de ser igual ou posterior à data de início.", "erro")
+        return redirect(url_for("relatorios"))
+
+    try:
+        xml_bytes = _pedir_xml_avaliacao_externa(id_utilizador, data_inicio, data_fim)
+        validar_xml_avaliacao(xml_bytes)
+    except (urllib_error.URLError, TimeoutError, RuntimeError, ErroValidacaoXML):
+        app.logger.exception("Não foi possível obter/validar o XML de avaliação.")
+        flash("Não foi possível obter o XML validado da avaliação financeira.", "erro")
+        return redirect(url_for("relatorios"))
+
+    nome_ficheiro = f"avaliacao_financeira_{data_inicio.isoformat()}_a_{data_fim.isoformat()}.xml"
+    return Response(
+        xml_bytes,
         mimetype="application/xml; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{nome_ficheiro}"'},
     )

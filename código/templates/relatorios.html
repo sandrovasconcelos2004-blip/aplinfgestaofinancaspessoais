@@ -43,13 +43,42 @@
 
             <div class="cabecalho-relatorio">
                 <h1>{{ carteira.Carteira if carteira else "Todas as carteiras" }}</h1>
-                <button type="button" id="abrir-exportar" class="botao-exportar">
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
-                    </svg>
-                    Exportar dados
-                </button>
+                <div class="acoes-relatorio">
+                    <button type="button" id="abrir-avaliar" class="botao-exportar botao-avaliar">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
+                        </svg>
+                        Avaliar saúde financeira
+                    </button>
+                    <button type="button" id="abrir-exportar" class="botao-exportar">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>
+                        </svg>
+                        Exportar dados
+                    </button>
+                </div>
             </div>
+
+            <dialog id="janela-avaliar" class="janela-transacao" aria-labelledby="titulo-avaliar">
+                <div class="topo-janela">
+                    <h2 id="titulo-avaliar">Avaliar saúde financeira</h2>
+                    <button type="button" class="fechar" aria-label="Fechar">×</button>
+                </div>
+
+                <form id="form-avaliar" class="formulario-simples" method="post" action="{{ url_for('avaliar_saude_financeira') }}">
+                    <p class="descricao-exportacao">
+                        Escolha o período para o serviço externo calcular o seu score financeiro (XML validado por XSD e transformado via XSLT).
+                    </p>
+
+                    <label for="avaliar_data_inicio">Data de início:</label>
+                    <input type="date" id="avaliar_data_inicio" name="data_inicio" value="{{ data_inicio_padrao }}" required>
+
+                    <label for="avaliar_data_fim">Data de fim:</label>
+                    <input type="date" id="avaliar_data_fim" name="data_fim" value="{{ data_fim_padrao }}" required>
+
+                    <input type="submit" value="Gerar avaliação">
+                </form>
+            </dialog>
 
             <dialog id="janela-exportar" class="janela-transacao" aria-labelledby="titulo-exportar">
                 <div class="topo-janela">
@@ -182,6 +211,38 @@
             validarDatasExportacao();
             if (formExportar.checkValidity()) {
                 janelaExportar.close();
+            }
+        });
+
+        const janelaAvaliar = document.getElementById("janela-avaliar");
+        const formAvaliar = document.getElementById("form-avaliar");
+        const campoAvaliarInicio = document.getElementById("avaliar_data_inicio");
+        const campoAvaliarFim = document.getElementById("avaliar_data_fim");
+
+        function validarDatasAvaliacao() {
+            if (campoAvaliarInicio.value && campoAvaliarFim.value && campoAvaliarFim.value < campoAvaliarInicio.value) {
+                campoAvaliarFim.setCustomValidity("A data de fim tem de ser igual ou posterior à data de início.");
+            } else {
+                campoAvaliarFim.setCustomValidity("");
+            }
+        }
+
+        document.getElementById("abrir-avaliar").addEventListener("click", function () {
+            validarDatasAvaliacao();
+            janelaAvaliar.showModal();
+        });
+
+        janelaAvaliar.querySelector(".fechar").addEventListener("click", function () {
+            janelaAvaliar.close();
+        });
+
+        campoAvaliarInicio.addEventListener("input", validarDatasAvaliacao);
+        campoAvaliarFim.addEventListener("input", validarDatasAvaliacao);
+
+        formAvaliar.addEventListener("submit", function () {
+            validarDatasAvaliacao();
+            if (formAvaliar.checkValidity()) {
+                janelaAvaliar.close();
             }
         });
     </script>

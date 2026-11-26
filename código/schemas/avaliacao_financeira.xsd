@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Esquema XSD (XML Schema 1.0) para o relatório de avaliação de saúde financeira — Finances4You.
+
+    Contrato partilhado entre o serviço externo de cálculo de score financeiro
+    (produtor do XML) e a aplicação Finances4You (consumidor que valida o XML
+    e o transforma em HTML através de avaliacao_financeira.xsl).
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://finances4you.pt/schemas/avaliacao-financeira"
+           xmlns:tns="http://finances4you.pt/schemas/avaliacao-financeira"
+           elementFormDefault="qualified"
+           attributeFormDefault="unqualified"
+           version="1.0">
+
+    <!-- =================================================================== -->
+    <!-- Elemento raiz                                                       -->
+    <!-- =================================================================== -->
+    <xs:element name="AvaliacaoFinanceira" type="tns:TipoAvaliacaoFinanceira">
+        <xs:annotation>
+            <xs:documentation>
+                Documento raiz que representa o resultado da avaliação de saúde
+                financeira de um utilizador num determinado período.
+            </xs:documentation>
+        </xs:annotation>
+
+        <!-- Cada pilar de avaliação é único pelo seu código -->
+        <xs:unique name="ukPilarCodigo">
+            <xs:selector xpath="tns:Pilares/tns:Pilar"/>
+            <xs:field xpath="@codigo"/>
+        </xs:unique>
+    </xs:element>
+
+    <!-- =================================================================== -->
+    <!-- Tipos complexos                                                     -->
+    <!-- =================================================================== -->
+    <xs:complexType name="TipoAvaliacaoFinanceira">
+        <xs:sequence>
+            <xs:element name="Periodo" type="tns:TipoPeriodo"/>
+            <xs:element name="Utilizador" type="tns:TipoUtilizador"/>
+            <xs:element name="ResumoFinanceiro" type="tns:TipoResumoFinanceiro"/>
+            <xs:element name="ScoreGlobal" type="tns:TipoScoreGlobal"/>
+            <xs:element name="Pilares" type="tns:TipoListaPilares"/>
+            <xs:element name="DistribuicaoCategorias" type="tns:TipoListaDistribuicaoCategorias"/>
+            <xs:element name="Recomendacoes" type="tns:TipoListaRecomendacoes"/>
+        </xs:sequence>
+        <xs:attribute name="dataAvaliacao" type="xs:dateTime" use="required"/>
+        <xs:attribute name="moeda" type="tns:TipoMoeda" use="required"/>
+        <xs:attribute name="versao" type="xs:string" use="optional" default="1.0"/>
+    </xs:complexType>
+
+    <xs:complexType name="TipoPeriodo">
+        <xs:sequence>
+            <xs:element name="DataInicio" type="xs:date"/>
+            <xs:element name="DataFim" type="xs:date"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="TipoUtilizador">
+        <xs:sequence>
+            <xs:element name="Nome" type="tns:TipoTexto100"/>
+            <xs:element name="Apelido" type="tns:TipoTexto100"/>
+            <xs:element name="Email" type="tns:TipoEmail"/>
+        </xs:sequence>
+        <xs:attribute name="id" type="tns:TipoID" use="required"/>
+    </xs:complexType>
+
+    <xs:complexType name="TipoResumoFinanceiro">
+        <xs:sequence>
+            <xs:element name="TotalReceitas" type="tns:TipoValorNaoNegativo"/>
+            <xs:element name="TotalDespesas" type="tns:TipoValorNaoNegativo"/>
+            <xs:element name="ResultadoLiquido" type="tns:TipoValorMonetario"/>
+            <xs:element name="SaldoTotalCarteiras" type="tns:TipoValorNaoNegativo"/>
+            <xs:element name="TotalTransacoes" type="xs:nonNegativeInteger"/>
+            <xs:element name="TransacoesPendentes" type="xs:nonNegativeInteger"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="TipoScoreGlobal">
+        <xs:sequence>
+            <xs:element name="Pontuacao" type="tns:TipoPontuacaoGlobal"/>
+            <xs:element name="Rating" type="tns:TipoRating"/>
+            <xs:element name="Classificacao" type="tns:TipoTexto100"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="TipoListaPilares">
+        <xs:sequence>
+            <xs:element name="Pilar" type="tns:TipoPilar" minOccurs="4" maxOccurs="4"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="TipoPilar">
+        <xs:sequence>
+            <xs:element name="Nome" type="tns:TipoTexto100"/>
+            <xs:element name="Pontuacao" type="xs:nonNegativeInteger"/>
+            <xs:element name="Maximo" type="xs:positiveInteger"/>
+            <xs:element name="Percentagem" type="tns:TipoPercentagem"/>
+            <xs:element name="IndicadorValor" type="tns:TipoTexto100"/>
+            <xs:element name="Estado" type="tns:TipoEstadoPilar"/>
+            <xs:element name="Detalhes" type="tns:TipoTextoLongo"/>
+        </xs:sequence>
+        <xs:attribute name="codigo" type="tns:TipoCodigoPilar" use="required"/>
+    </xs:complexType>
+
+    <xs:complexType name="TipoListaDistribuicaoCategorias">
+        <xs:sequence>
+            <xs:element name="CategoriaResumo" type="tns:TipoCategoriaResumo" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="TipoCategoriaResumo">
+        <xs:sequence>
+            <xs:element name="Nome" type="tns:TipoTexto100"/>
+            <xs:element name="Total" type="tns:TipoValorNaoNegativo"/>
+            <xs:element name="Percentagem" type="tns:TipoPercentagem"/>
+        </xs:sequence>
+        <xs:attribute name="natureza" type="tns:TipoNaturezaCategoria" use="required"/>
+    </xs:complexType>
+
+    <xs:complexType name="TipoListaRecomendacoes">
+        <xs:sequence>
+            <xs:element name="Recomendacao" type="tns:TipoRecomendacao" minOccurs="1" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="TipoRecomendacao">
+        <xs:simpleContent>
+            <xs:extension base="tns:TipoTextoLongo">
+                <xs:attribute name="prioridade" type="tns:TipoPrioridade" use="required"/>
+            </xs:extension>
+        </xs:simpleContent>
+    </xs:complexType>
+
+    <!-- =================================================================== -->
+    <!-- Tipos simples                                                       -->
+    <!-- =================================================================== -->
+    <xs:simpleType name="TipoID">
+        <xs:restriction base="xs:positiveInteger">
+            <xs:maxInclusive value="2147483647"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoTexto100">
+        <xs:restriction base="xs:token">
+            <xs:minLength value="1"/>
+            <xs:maxLength value="100"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoTextoLongo">
+        <xs:restriction base="xs:token">
+            <xs:minLength value="1"/>
+            <xs:maxLength value="500"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoEmail">
+        <xs:restriction base="xs:token">
+            <xs:minLength value="3"/>
+            <xs:maxLength value="150"/>
+            <xs:pattern value="[^@\s]+@[^@\s]+\.[^@\s]+"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoValorMonetario">
+        <xs:restriction base="xs:decimal">
+            <xs:totalDigits value="12"/>
+            <xs:fractionDigits value="2"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoValorNaoNegativo">
+        <xs:restriction base="tns:TipoValorMonetario">
+            <xs:minInclusive value="0.00"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoPercentagem">
+        <xs:restriction base="xs:decimal">
+            <xs:minInclusive value="0.0"/>
+            <xs:maxInclusive value="100.0"/>
+            <xs:fractionDigits value="1"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoPontuacaoGlobal">
+        <xs:restriction base="xs:integer">
+            <xs:minInclusive value="0"/>
+            <xs:maxInclusive value="100"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoRating">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="A"/>
+            <xs:enumeration value="B"/>
+            <xs:enumeration value="C"/>
+            <xs:enumeration value="D"/>
+            <xs:enumeration value="E"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoCodigoPilar">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="poupanca"/>
+            <xs:enumeration value="equilibrio"/>
+            <xs:enumeration value="liquidez"/>
+            <xs:enumeration value="pendentes"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoEstadoPilar">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="otimo"/>
+            <xs:enumeration value="bom"/>
+            <xs:enumeration value="alerta"/>
+            <xs:enumeration value="critico"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoNaturezaCategoria">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="essencial"/>
+            <xs:enumeration value="discricionario"/>
+            <xs:enumeration value="outros"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoPrioridade">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="alta"/>
+            <xs:enumeration value="media"/>
+            <xs:enumeration value="baixa"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TipoMoeda">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="EUR"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+</xs:schema>

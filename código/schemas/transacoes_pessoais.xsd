@@ -152,16 +152,13 @@
     <xs:complexType name="TipoCategoria">
         <xs:annotation>
             <xs:documentation>
-                Categoria associada às transações exportadas (tabela Categorias).
-                O atributo personalizada indica se foi criada pelo utilizador
-                (ID_Utilizador IS NOT NULL) ou se é pré-definida (ID_Utilizador IS NULL).
+                Categoria pré-definida associada às transações exportadas (tabela Categorias).
             </xs:documentation>
         </xs:annotation>
         <xs:sequence>
             <xs:element name="Nome" type="tns:TipoTexto100"/>
         </xs:sequence>
         <xs:attribute name="id" type="tns:TipoID" use="required"/>
-        <xs:attribute name="personalizada" type="xs:boolean" use="required"/>
     </xs:complexType>
 
     <xs:complexType name="TipoListaTransacoes">
